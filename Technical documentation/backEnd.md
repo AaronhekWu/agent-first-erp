@@ -4,7 +4,7 @@
 
 后端团队负责构建系统的核心业务逻辑、数据管理、API网关、认证授权、消息队列和AI集成等关键模块。
 
-后端采用**Java/Python微服务 + PostgreSQL + MongoDB + Redis + Kubernetes**的云原生架构。系统支持多租户隔离、高并发处理、实时数据同步和AI模型集成。后端团队规模为6-7人，分别负责不同的微服务模块开发。
+后端采用**Java/Python微服务 + PostgreSQL + MongoDB + Redis + Kubernetes**的云原生架构。系统支持多租户隔离、高并发处理、实时数据同步和AI模型集成。
 
 ---
 
