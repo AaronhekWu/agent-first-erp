@@ -2,692 +2,341 @@
 
 > 面向教育企业内部员工的智能学员信息平台。<br/>
 > 员工通过 **微信** 或 **网页后台** 获取和更新学员信息；<br/>
-> AI Agent 通过 **MCP / Tool Gateway** 调用共享业务能力；<br/>
-> 系统采用 **Django 单体模块化架构**，强调 **业务解耦、低预算起步、可分块上线、可逐步扩展本地 AI 能力**。
+> AI Agent 通过 **Tool Gateway** 调用共享业务能力；<br/>
+> 系统采用 **Django 单体模块化架构 + Supabase 数据层**，强调 **业务解耦、低预算起步、可分块上线、可逐步扩展本地 AI 能力**。
 
 ---
 
-## 1. 项目概述
+## 当前开发状态（2026-03-30）
 
-Agent-First ERP 不是传统意义上的“后台系统 + AI 助手”，而是一套以 **业务底座稳定运行** 为前提、以 **AI Agent 自然语言交互** 为增强能力的教育企业内部平台。
+> **给接手的开发者 / AI：请先读这一节，再看下面的详细规格。**
 
-系统的目标不是一开始就构建复杂的 AI 基础设施，而是先解决教育企业在日常运营中的高频问题：
+### 已完成
 
-- 学员信息查询成本高
-- 跟进记录分散、难以汇总
-- 微信场景下操作不方便
-- 报表和摘要依赖人工整理
-- AI 接入容易直接侵入业务系统，造成权限与审计风险
+#### Supabase 数据库层（全部就绪）
 
-因此，本项目规划为以下几层协同工作：
+Supabase 项目 `nartypzacmsvfskcxfki`（ap-northeast-1）已完成 8 次迁移，20 张表已上线：
 
-- **微信入口**：员工高频查询和轻量更新入口
-- **网页后台**：管理员配置、管理、报表、审计入口
-- **AI Agent 层**：自然语言交互与任务编排
-- **MCP / Tool Gateway**：统一业务能力抽象层
-- **Django 主系统**：前后端不分离的核心业务平台
-- **数据库 / 文件池**：企业数据底座
-- **远程 AI API + 本地 AI 预留**：低预算启动，后续平滑升级
+| 模块前缀 | 表 | 状态 |
+|---|---|---|
+| `acct_` | profiles / departments / roles / user_roles / user_departments | ✅ 已上线 |
+| `stu_` | students / parents / tags / student_tags | ✅ 已上线 |
+| `crs_` | courses / enrollments / attendance | ✅ 已上线 |
+| `flup_` | records | ✅ 已上线 |
+| `agt_` | agents / prompt_templates / sessions / messages / tool_configs | ✅ 已上线 |
+| `aud_` | operation_logs / agent_call_logs | ✅ 已上线 |
 
-### 核心目标
+- RLS 行级安全策略已配置（admin / teacher / counselor / viewer 四级角色）
+- 种子数据已写入（4 个默认角色、1 个默认 Agent `default_assistant`、6 个工具配置）
+- `auth.users` 触发器已配置（新用户注册自动创建 `acct_profiles`）
+- `pg_trgm` 模糊搜索、`moddatetime` 自动更新时间戳均已启用
 
-1. 降低员工使用门槛，不依赖复杂后台操作
-2. 让查询、更新、摘要、报表更自然、更高效
-3. 保证 AI 与业务数据解耦，避免模型直连数据库
-4. 用模块化单体方式低成本上线，并支持未来拆分与扩容
+#### Django 服务层（骨架完成，待接 Supabase 凭证运行）
 
----
+```
+apps/
+├── core/         # Supabase 客户端、泛型 Repository、Pydantic 基础模型、依赖注入
+├── accounts/     # 用户档案、角色、部门（models + repositories + services + views）
+├── students/     # 学员、家长、标签（含模糊搜索）
+├── courses/      # 课程、报名、考勤统计
+├── followups/    # 跟进记录、待提醒查询
+├── agents/       # Agent 配置、会话、消息历史、工具配置
+├── audits/       # 操作日志、Agent 调用日志（仅追加）
+└── tools/        # ToolGateway + 工具注册表 + student/followup/course 工具
+```
 
-## 2. 设计原则
+每个模块结构一致：`models.py → repositories.py → services.py → views.py + urls.py`
 
-### 2.1 业务解耦
+### 尚未完成（下一步重点）
 
-- 微信入口与网页入口解耦
-- AI Agent 与业务系统解耦
-- 业务能力通过 MCP / Tool Gateway 暴露
-- 学员、课程、跟进、文件、报表、权限、审计按模块拆分
-
-### 2.2 前后端不分离
-
-- 主系统采用 Django 单体架构
-- 后台页面由 Django 服务端渲染
-- 避免单独维护前端 SPA 工程，降低初期复杂度
-
-### 2.3 低预算优先
-
-- 第一阶段不强依赖本地大模型
-- AI 能力优先接入远程 AI API
-- 本地服务器以业务系统稳定运行为优先
-- 预留本地轻量模型、向量库、GPU 节点扩展位
-
-### 2.4 可分块上线
-
-- 先上核心业务模块
-- 后上文件池、报表、审计
-- 再上知识检索、画像分析、本地模型
-
-### 2.5 安全与审计
-
-- AI 不直接操作数据库
-- 所有业务操作通过 Django 模块 / Tool Gateway 完成
-- 敏感操作必须可审计
-- 高风险更新可接入审批流
+- **Django 后台页面**：模板、登录页、学员管理页、跟进管理页（当前只有 JSON API）
+- **Supabase 凭证配置**：`.env` 文件中填写真实密钥后即可运行
+- **AI 模型对接**：`agents/views.py` 中 `execute_tool` 端点已就绪，需接入真实 LLM（调用链：LLM → ToolGateway → Service → Supabase）
+- **微信 Webhook**：预留了 `channel=wechat` 会话类型，需接入企业微信回调
+- **身份认证中间件**：当前视图用 `HTTP_X_USER_ID` 头占位，需替换为 Supabase JWT 校验
+- **files / reports 模块**：数据库层暂未建表，属于阶段 3
 
 ---
 
-## 3. 当前目标形态
+## 快速启动
 
-### 3.1 用户入口
+```bash
+# 1. 安装依赖
+pip install -r requirements/dev.txt
 
-#### 微信入口
+# 2. 配置环境变量（填入真实 Supabase 密钥）
+cp .env.example .env
+# 编辑 .env，填写 SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_KEY
 
-用于：
+# 3. 启动
+python manage.py runserver
 
-- 查询学员信息
-- 查询课程、报名、出勤、跟进情况
-- 更新轻量跟进记录
-- 获取 AI 总结、建议、摘要
+# 健康检查
+curl http://localhost:8000/health/
+```
 
-#### 网页后台
-
-用于：
-
-- 学员信息管理
-- 跟进记录管理
-- 文件池管理
-- 报表查看
-- 角色权限管理
-- 审计日志查看
-- Agent / Prompt / Tool 配置
-
-### 3.2 核心架构组件
-
-- **Django 主系统**：业务核心平台，前后端不分离
-- **MCP / Tool Gateway**：统一抽象业务能力
-- **AI Agent 接入层**：接收微信消息，完成自然语言交互
-- **PostgreSQL / MySQL**：业务主数据库
-- **Redis**：缓存、队列、会话辅助
-- **OSS / 本地文件池**：文件存储
-- **远程 AI API**：初期主要模型能力来源
-- **本地轻量 AI 预留**：未来可接摘要、分类、RAG
+**Supabase 项目地址**：`https://supabase.com/dashboard/project/nartypzacmsvfskcxfki`
 
 ---
 
-## 4. 总体架构
+## 架构核心约束（开发者必读）
 
-```mermaid
-flowchart TB
-    subgraph A[用户入口]
-        WX[微信入口]
-        WEB[网页管理端<br/>Django 服务端渲染]
-    end
+### AI Agent 不允许直接访问数据库
 
-    subgraph B[主业务平台 单体优先 / 模块化设计]
-        DJ[Django 主系统<br/>前后端不分离]
-        M1[学员模块]
-        M2[课程模块]
-        M3[跟进模块]
-        M4[文件池模块]
-        M5[报表模块]
-        M6[权限审批模块]
-        M7[审计日志模块]
-    end
+```
+AI Agent
+   │
+   ▼
+apps/tools/gateway.py  ← ToolGateway（唯一入口）
+   │  ├─ 验证工具是否存在
+   │  ├─ 执行工具函数
+   │  └─ 写入 aud_agent_call_logs
+   ▼
+apps/tools/*_tools.py  ← 工具函数（通过 ToolContext 获取 Service）
+   │
+   ▼
+apps/*/services.py     ← 业务逻辑（通过 Repository 访问数据）
+   │
+   ▼
+apps/*/repositories.py ← 数据访问（通过 Supabase 客户端）
+   │
+   ▼
+Supabase（RLS 兜底）
+```
 
-    subgraph C[AI 与工具抽象层]
-        AGENT[AI Agent 接入层]
-        MCP[MCP / Tool Gateway]
-        ROUTER[模型路由层]
-    end
+### 新增业务模块的正确姿势
 
-    subgraph D[数据层]
-        DB[(PostgreSQL / MySQL)]
-        OSS[(OSS / 本地文件存储)]
-        CACHE[(Redis)]
-        LOG[(日志库)]
-    end
+1. 在 Supabase 执行 DDL 迁移（通过 MCP 工具 `apply_migration`）
+2. 在 `apps/core/constants.py` 添加表名常量
+3. 新建 `apps/<module>/models.py`（Pydantic，继承 `SupabaseModel`）
+4. 新建 `apps/<module>/repositories.py`（继承 `BaseRepository[T]`）
+5. 新建 `apps/<module>/services.py`（注入 Repository + `AuditService`）
+6. 如需暴露给 AI Agent，在 `apps/tools/<module>_tools.py` 用 `@register_tool` 注册
+7. 新建 `apps/<module>/views.py` + `urls.py`，在 `config/urls.py` 挂载
+8. 在 `apps/core/deps.py` 注册服务实例
 
-    subgraph E[AI 能力层]
-        REMOTE[远程 AI API]
-        LOCAL[本地轻量模型预留]
-    end
+> **原则**：每层只依赖下一层，不跨层调用。Service 不直接用 Supabase 客户端，View 不直接用 Repository。
 
-    WX --> AGENT
-    WEB --> DJ
+### 双客户端策略
 
-    DJ --> M1
-    DJ --> M2
-    DJ --> M3
-    DJ --> M4
-    DJ --> M5
-    DJ --> M6
-    DJ --> M7
+| 客户端 | 用于 | RLS |
+|---|---|---|
+| `anon_client`（anon key） | 普通用户 API 请求 | 生效（用户只看自己权限内的数据） |
+| `service_client`（service_role key） | ToolGateway、后台定时任务 | 绕过（Gateway 自行鉴权） |
 
-    AGENT --> MCP
-    MCP --> M1
-    MCP --> M2
-    MCP --> M3
-    MCP --> M4
-    MCP --> M5
-    MCP --> M6
-    MCP --> M7
+---
 
-    AGENT --> ROUTER
-    ROUTER --> REMOTE
-    ROUTER --> LOCAL
+## 项目结构
 
-    M1 --> DB
-    M2 --> DB
-    M3 --> DB
-    M4 --> OSS
-    M5 --> DB
-    M6 --> DB
-    M7 --> LOG
-    DJ --> CACHE
-    MCP --> CACHE
+```
+project-root/
+├── manage.py
+├── pyproject.toml
+├── .env.example             # 环境变量模板
+├── requirements/
+│   ├── base.txt             # Django, supabase-py, pydantic
+│   ├── dev.txt
+│   └── prod.txt
+├── config/
+│   ├── settings/
+│   │   ├── base.py          # 公共配置
+│   │   ├── dev.py
+│   │   └── prod.py
+│   └── urls.py              # 主路由
+├── apps/
+│   ├── core/                # 基础设施（db, constants, models, repositories, deps, middleware）
+│   ├── accounts/            # 用户、角色、部门
+│   ├── students/            # 学员（含模糊搜索）
+│   ├── courses/             # 课程、报名、考勤
+│   ├── followups/           # 跟进记录
+│   ├── agents/              # AI Agent 配置、会话、消息
+│   ├── audits/              # 审计日志（仅追加）
+│   └── tools/               # ToolGateway + 工具注册
+└── templates/               # Django 模板（待填充）
 ```
 
 ---
 
-## 5. 模块划分
+## 设计原则
 
-项目采用 Django 单体模块化设计，建议按 app 拆分。
+### 业务解耦
 
-### 5.1 accounts
+- 微信入口与网页入口解耦
+- AI Agent 与业务系统解耦（通过 ToolGateway）
+- 各模块独立，按需上线
+- 不同层之间通过接口依赖，不直接引用实现
 
-负责：
+### 前后端不分离
 
-- 用户
-- 角色
-- 部门
-- 登录认证
-- 权限控制
+- 主系统采用 Django 单体架构，服务端渲染
+- 避免单独维护前端 SPA，降低初期复杂度
+- API 端点仅供 Agent 和未来移动端使用
 
-### 5.2 students
+### 低预算优先
 
-负责：
+- 第一阶段不强依赖本地大模型
+- AI 能力优先接入远程 AI API（已预置 `default_assistant` Agent 配置）
+- 预留本地轻量模型、向量库（`vector` 扩展已在 Supabase 可用）、GPU 扩展位
 
-- 学员基础信息
-- 家长信息
-- 学员状态
-- 标签关系
+### 安全与审计
 
-### 5.3 courses
-
-负责：
-
-- 课程信息
-- 报名信息
-- 班级归属
-- 出勤记录
-
-### 5.4 followups
-
-负责：
-
-- 跟进记录
-- 跟进计划
-- 跟进结果
-- 下次跟进提醒
-
-### 5.5 files
-
-负责：
-
-- 文件元数据
-- 学员关联附件
-- 文件分类
-- 文件权限
-- OSS / 本地存储适配
-
-### 5.6 reports
-
-负责：
-
-- 数据统计
-- 可视化报表
-- 周报 / 月报生成
-- 运营分析接口
-
-### 5.7 agents
-
-负责：
-
-- AI Agent 配置
-- Prompt 模板
-- Tool 配置
-- 模型路由配置
-
-### 5.8 audits
-
-负责：
-
-- 操作日志
-- 审计日志
-- Agent 调用日志
-- 数据访问日志
-
-### 5.9 core
-
-负责：
-
-- 公共基类
-- 通用工具
-- 配置封装
-- 中间件
-- 错误处理
+- AI 不直接操作数据库
+- 所有写操作自动写入 `aud_operation_logs`（通过 Service 层）
+- 所有工具调用自动写入 `aud_agent_call_logs`（通过 ToolGateway）
+- 审计日志仅支持追加，代码层面禁止 update / delete
 
 ---
 
-## 6. 业务边界约束
+## 分阶段施工进度
 
-### 6.1 AI Agent 不允许
+### 阶段 0：项目初始化 ✅ 完成
 
-- 直接连接数据库
-- 绕过权限系统
-- 直接写业务表
-- 绕过审计机制
+- [x] 初始化 Git 仓库
+- [x] 建立 Django 项目骨架
+- [x] 建立基础 README
+- [x] 明确模块边界
+- [x] 明确环境变量规范（`.env.example`）
 
-### 6.2 所有 AI 调用业务数据必须经过
+### 阶段 1：业务数据底座 ✅ 完成（数据库层 + 服务层骨架）
 
-- MCP / Tool Gateway
-- Django 业务模块服务层
-- 权限校验
-- 审计日志记录
-
-### 6.3 高风险操作建议
-
-以下操作建议接入审计与审批：
-
-- 批量更新学员状态
-- 批量导出学员数据
-- 修改敏感字段
-- 跨部门读取数据
-
----
-
-## 7. 第一阶段范围（MVP）
-
-### 7.1 核心功能
-
-- 学员信息管理
-- 跟进记录管理
-- 微信查询学员信息
-- 微信查询跟进历史
-- 轻量 AI 摘要与建议
-- 基础权限管理
-- 基础审计日志
-
-### 7.2 暂不优先
-
-- 本地 70B 模型
-- 多 Agent Team
-- 复杂向量检索
-- 高级画像系统
-- 完整审批流
-- 重型前端 SPA
-
----
-
-## 8. 分阶段施工进度
-
-### 阶段 0：项目初始化
-
-**目标**：建立统一仓库、基础文档、开发规范、目录结构。
-
-**状态**：
-
-- [ ] 初始化 Git 仓库
-- [ ] 建立 Django 项目骨架
-- [ ] 建立基础 README
-- [ ] 明确模块边界
-- [ ] 明确环境变量规范
-- [ ] 建立 issue / milestone 规则
-
-**交付物**：
-
-- 项目目录结构
-- README.md
-- 初始 settings
-- requirements / pyproject
-- `.env.example`
-
-### 阶段 1：业务主系统 MVP
-
-**目标**：先让网页后台和核心业务数据跑起来。
-
-**状态**：
-
-- [ ] accounts 模块
-  - [ ] 用户模型
-  - [ ] 角色模型
-  - [ ] 部门模型
-  - [ ] 登录认证
-  - [ ] 基础 RBAC
-- [ ] students 模块
-  - [ ] 学员基础信息
-  - [ ] 标签关系
-  - [ ] 学员列表 / 详情页
-- [ ] courses 模块
-  - [ ] 课程
-  - [ ] 报名
-  - [ ] 出勤
-- [ ] followups 模块
-  - [ ] 跟进记录
-  - [ ] 跟进记录列表 / 新增 / 编辑
-- [ ] audits 模块
-  - [ ] 操作日志
-  - [ ] 重要动作审计
-- [ ] Django 后台页面基础框架
-  - [ ] 首页
-  - [ ] 学员管理页
-  - [ ] 跟进管理页
+- [x] accounts 模块
+  - [x] 用户模型（`acct_profiles`）
+  - [x] 角色模型（`acct_roles`，含权限字符串数组）
+  - [x] 部门模型（`acct_departments`，支持层级）
+  - [x] 基础 RBAC（`AccountService.user_has_role / user_has_permission`）
+- [x] students 模块
+  - [x] 学员基础信息（含软删除）
+  - [x] 家长信息
+  - [x] 标签关系（多对多）
+  - [x] 模糊搜索（`pg_trgm` GIN 索引）
+- [x] courses 模块
+  - [x] 课程
+  - [x] 报名
+  - [x] 考勤统计
+- [x] followups 模块
+  - [x] 跟进记录
+  - [x] 待提醒查询（部分索引）
+- [x] audits 模块
+  - [x] 操作日志（仅追加）
+  - [x] Agent 调用日志
+- [ ] **Django 后台页面（待做）**
   - [ ] 登录页
+  - [ ] 学员管理页（列表 / 详情 / 编辑）
+  - [ ] 跟进管理页
+  - [ ] 首页 / 仪表盘
 
-**交付物**：
+### 阶段 2：AI 接入层 ✅ 骨架完成，待对接真实 LLM
 
-- 网页后台可登录
-- 学员信息可录入 / 查询 / 编辑
-- 跟进记录可维护
-- 基础权限可用
-- 审计日志基础版可用
+- [x] Tool Gateway（`apps/tools/gateway.py`）
+- [x] 工具注册表（`@register_tool` 装饰器）
+- [x] 学员查询工具（`search_students`, `get_student_detail`）
+- [x] 跟进工具（`get_followup_history`, `create_followup`）
+- [x] 课程工具（`get_enrollments`, `get_attendance_summary`）
+- [x] 会话管理 API（`POST /api/v1/agents/sessions/`）
+- [x] 工具执行 API（`POST /api/v1/agents/tools/execute/`）
+- [x] Agent 调用日志自动记录
+- [ ] **接入真实 LLM（待做）**：在 `agents/views.py` 中实现消息路由逻辑（用户消息 → LLM → 工具调用 → 回复）
+- [ ] **Supabase JWT 认证中间件（待做）**：替换当前 `HTTP_X_USER_ID` 占位
+- [ ] **微信 Webhook（待做）**：企业微信回调 → 创建 `channel=wechat` 会话 → 调用 Agent
 
-### 阶段 2：AI 接入 MVP
+### 阶段 3：文件池与报表（未开始）
 
-**目标**：接入微信 + AI Agent，实现自然语言查询。
+- [ ] `stu_files` / `stu_file_permissions` 表迁移
+- [ ] files 模块（元数据 + Supabase Storage 适配）
+- [ ] reports 模块（学员统计 / 跟进统计 / 课程分析）
+- [ ] 报表导出审计
 
-**状态**：
+### 阶段 4：可扩展 AI 能力（规划中）
 
-- [ ] AI Agent 接入层
-  - [ ] webhook 入口预留
-  - [ ] 对话请求接收
-  - [ ] 会话上下文管理
-- [ ] MCP / Tool Gateway
-  - [ ] 查询学员信息工具
-  - [ ] 查询课程信息工具
-  - [ ] 查询跟进记录工具
-  - [ ] 写入轻量跟进工具
-- [ ] 模型路由层
-  - [ ] 接远程 AI API
-  - [ ] 模型配置
-  - [ ] 错误重试与降级
-- [ ] 基础安全
-  - [ ] 工具调用鉴权
-  - [ ] Agent 调用日志
-
-**交付物**：
-
-- 微信可查学员基础信息
-- 微信可查跟进历史
-- 微信可生成学员摘要
-- MCP 工具层可用
-- AI 不直连数据库
-
-### 阶段 3：文件池与报表
-
-**目标**：让系统具备资料管理和基础分析能力。
-
-**状态**：
-
-- [ ] files 模块
-  - [ ] 文件元数据
-  - [ ] 文件上传
-  - [ ] 文件分类
-  - [ ] 文件关联学员
-- [ ] reports 模块
-  - [ ] 学员统计
-  - [ ] 跟进统计
-  - [ ] 课程 / 出勤分析
-  - [ ] 基础可视化
-- [ ] 审计增强
-  - [ ] 文件访问日志
-  - [ ] 报表导出日志
-
-**交付物**：
-
-- 文件池可用
-- 基础报表可用
-- 文件访问可审计
-
-### 阶段 4：可扩展 AI 能力
-
-**目标**：为后续本地模型、知识库和画像分析打基础。
-
-**状态**：
-
-- [ ] 本地轻量模型接入预留
-- [ ] 向量检索接口预留
-- [ ] 学员画像摘要模型预留
-- [ ] Prompt 配置页
-- [ ] Agent 配置页
-- [ ] 多模型切换能力
-
-**交付物**：
-
-- AI 能力配置化
-- 本地模型可插拔
-- RAG / 画像系统可接入
-
-### 阶段 5：后续增强（非当前优先）
-
-**规划项**：
-
-- [ ] 本地轻量模型正式部署
-- [ ] 70B 总控模型评估
-- [ ] 向量知识库上线
-- [ ] 画像分析服务
-- [ ] 审批流
-- [ ] 多 Agent Team
-- [ ] 本地 GPU 节点扩展
-- [ ] 混合云部署
+- [ ] 向量检索（`pgvector` 扩展已在 Supabase 可用，需建表）
+- [ ] Prompt 配置页（前端）
+- [ ] 多模型路由（`agt_agents.model_id` 已预留字段）
+- [ ] 本地轻量模型插拔
 
 ---
 
-## 9. 当前技术决策
+## API 端点一览
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `GET` | `/health/` | 健康检查 |
+| `GET` | `/api/v1/accounts/roles/` | 角色列表 |
+| `GET` | `/api/v1/accounts/departments/` | 部门列表 |
+| `GET` | `/api/v1/students/` | 学员列表（分页） |
+| `GET` | `/api/v1/students/search/?q=张三` | 学员模糊搜索 |
+| `POST` | `/api/v1/students/create/` | 创建学员 |
+| `GET` | `/api/v1/students/<id>/` | 学员详情（含家长、标签） |
+| `GET` | `/api/v1/courses/` | 课程列表 |
+| `GET` | `/api/v1/courses/enrollments/<student_id>/` | 学员报名记录 |
+| `GET` | `/api/v1/courses/attendance/<student_id>/` | 学员考勤统计 |
+| `GET` | `/api/v1/followups/<student_id>/` | 学员跟进历史 |
+| `POST` | `/api/v1/followups/create/` | 创建跟进记录 |
+| `GET` | `/api/v1/followups/reminders/` | 待发送提醒列表 |
+| `POST` | `/api/v1/agents/sessions/` | 创建 Agent 会话 |
+| `GET` | `/api/v1/agents/sessions/<id>/messages/` | 会话消息历史 |
+| `POST` | `/api/v1/agents/tools/execute/` | 执行工具调用（ToolGateway） |
+| `GET` | `/api/v1/agents/tools/` | 可用工具列表 |
+| `GET` | `/api/v1/audits/operations/` | 操作日志查询 |
+| `GET` | `/api/v1/audits/agent-calls/<session_id>/` | Agent 调用日志 |
+
+---
+
+## 技术决策
 
 ### 已确定
 
-- 主框架：Django
-- 架构方式：前后端不分离
-- 业务架构：单体模块化
-- AI 接入：Agent + MCP Tool Gateway
-- 数据库：PostgreSQL（优先）/ MySQL
-- 缓存：Redis
-- 文件存储：OSS 或本地文件存储
-- 模型策略：初期远程 AI API，后续预留本地模型
+- **主框架**：Django 5.x，前后端不分离，服务端渲染
+- **数据层**：Supabase（PostgreSQL 17.6）+ supabase-py 客户端（非 Django ORM）
+- **数据模型**：Pydantic v2（与 Django ORM 解耦，便于未来迁移数据库）
+- **认证**：Supabase Auth（JWT），通过 `acct_profiles` 扩展用户信息
+- **AI 接入**：Tool Gateway 模式，AI 不直连数据库
+- **审计**：双轨日志（操作日志 + Agent 调用日志），仅追加不可修改
 
 ### 暂不确定 / 待评估
 
 - 企业微信正式接入方式
-- 远程模型供应商
-- 文件池最终落 OSS 还是本地对象存储
-- 是否引入 Celery
-- 是否在第二阶段引入 pgvector
+- 远程 LLM 供应商（`default_assistant` 配置中预置 `claude-sonnet-4-20250514`，可改）
+- 文件存储：Supabase Storage vs 本地 OSS
+- 是否引入 Celery（当前跟进提醒依赖轮询，量大时需要）
+- 是否在阶段 3 引入 `pgvector`
 - 本地轻量模型选型
-- 本地 GPU 节点采购时机
 
 ---
 
-## 10. Codex / AI 开发协作指引
+## 给 AI 开发助手的指引
 
-如果你是 Codex 或其他 AI 编码助手，请优先理解以下约束：
+### 必须遵守
 
-### 10.1 必须遵守
+1. **Django 单体模块化**，不要拆微服务
+2. **前后端不分离**，页面用 Django 模板
+3. **AI Agent 不允许直接读写数据库**，必须通过 ToolGateway
+4. **新工具用 `@register_tool` 注册**，在 `agents/views.py` 的导入列表中添加
+5. **所有写操作调用 `AuditService.log_operation`**
+6. **新模块遵循 models → repositories → services → views 四层结构**
+7. **表名使用常量**（`apps/core/constants.py`），不硬编码字符串
 
-1. 项目是 **Django 单体模块化**
-2. **前后端不分离**
-3. 页面优先使用 Django 模板体系实现
-4. AI Agent 不允许直接读写数据库
-5. 所有业务能力必须通过 Django 模块服务层或 Tool Gateway 访问
-6. 代码必须便于未来拆模块和独立部署
-7. 所有敏感更新操作必须可审计
+### 当前最高优先级任务
 
-### 10.2 优先产出顺序
+1. **填充 `.env`**，验证 Supabase 连接
+2. **Django 模板**：登录页 + 学员管理页 + 跟进管理页
+3. **LLM 对接**：在 `agents/views.py` 中实现完整的对话循环（用户消息 → LLM → 工具调用 → 回复 → 保存消息）
+4. **JWT 中间件**：用 Supabase JWT 替换 `HTTP_X_USER_ID` 占位头
 
-1. Django 项目目录结构
-2. settings 拆分
-3. accounts / students / followups 模块
-4. 基础页面模板
-5. MCP Tool Gateway 骨架
-6. AI Agent 接入层骨架
-7. files / reports / audits 模块
+### 不要做的事
 
-### 10.3 不要优先做的事
-
-- 不要一开始构建复杂微服务
+- 不要构建复杂微服务
 - 不要先写前后端分离 SPA
 - 不要先接入重型本地大模型
-- 不要让 Agent 直接连接业务数据库
-- 不要忽略审计与权限边界
+- 不要让 Agent 绕过 ToolGateway 直连 Supabase
+- 不要在没有审计日志的情况下执行写操作
+- 不要修改 `aud_*` 表的仅追加约束
 
 ---
 
-## 11. 推荐目录结构
-
-```text
-project-root/
-├─ README.md
-├─ .env.example
-├─ requirements/
-│  ├─ base.txt
-│  ├─ dev.txt
-│  └─ prod.txt
-├─ manage.py
-├─ config/
-│  ├─ __init__.py
-│  ├─ settings/
-│  │  ├─ __init__.py
-│  │  ├─ base.py
-│  │  ├─ dev.py
-│  │  └─ prod.py
-│  ├─ urls.py
-│  ├─ wsgi.py
-│  └─ asgi.py
-├─ apps/
-│  ├─ core/
-│  ├─ accounts/
-│  ├─ students/
-│  ├─ courses/
-│  ├─ followups/
-│  ├─ files/
-│  ├─ reports/
-│  ├─ agents/
-│  └─ audits/
-├─ templates/
-│  ├─ base/
-│  ├─ accounts/
-│  ├─ students/
-│  ├─ followups/
-│  ├─ files/
-│  └─ reports/
-├─ static/
-│  ├─ css/
-│  ├─ js/
-│  └─ img/
-├─ media/
-├─ logs/
-├─ scripts/
-├─ docs/
-└─ tests/
-```
-
----
-
-## 12. 最近优先任务清单
-
-### P0
-
-- [ ] 初始化 Django 项目
-- [ ] 完成基础 settings
-- [ ] 完成 accounts 模块
-- [ ] 完成 students 模块
-- [ ] 完成 followups 模块
-- [ ] 完成后台基础 layout
-- [ ] 完成审计日志基础版
-
-### P1
-
-- [ ] MCP 工具层骨架
-- [ ] AI Agent 请求入口
-- [ ] 微信回调预留
-- [ ] 学员查询工具
-- [ ] 跟进记录查询工具
-- [ ] 跟进记录轻量写入工具
-
-### P2
-
-- [ ] 文件池模块
-- [ ] 报表模块
-- [ ] Prompt / Agent 配置页
-- [ ] 远程模型配置
-- [ ] 调用日志看板
-
-### P3
-
-- [ ] 向量检索预留
-- [ ] 本地轻量模型预留
-- [ ] 画像摘要服务预留
-
----
-
-## 13. 里程碑定义
-
-### Milestone 1：业务主系统可用
-
-完成标准：
-
-- 网页后台可登录
-- 学员可查可改
-- 跟进记录可维护
-- 权限基础可用
-- 审计基础可用
-
-### Milestone 2：微信查询可用
-
-完成标准：
-
-- 微信可查学员信息
-- 微信可查跟进历史
-- AI 可生成基础摘要
-- MCP 工具层可用
-
-### Milestone 3：文件与报表可用
-
-完成标准：
-
-- 文件池可上传管理
-- 报表可查看
-- 文件访问与报表导出可审计
-
-### Milestone 4：AI 配置化与扩展预留
-
-完成标准：
-
-- Agent / Prompt 可配置
-- 模型路由可切换
-- 本地模型接口预留完成
-- RAG / 画像可扩展
-
----
-
-## 14. 当前项目结论
-
-本项目当前优先级不是“先做最强 AI”，而是：
-
-1. 先做稳定的业务底座
-2. 先保证网页后台可用
-3. 先让微信查询跑通
-4. 用 MCP 保证 AI 与业务解耦
-5. 用模块化单体保证低预算快速上线
-6. 为后续本地 AI、知识库、画像分析保留扩展空间
-
----
-
-## 15. License
+## License
 
 待定
 
----
-
-## 16. Maintainers
+## Maintainers
 
 待补充
