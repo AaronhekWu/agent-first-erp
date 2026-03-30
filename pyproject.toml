@@ -1,0 +1,11 @@
+[project]
+name = "agent-first-erp"
+version = "0.1.0"
+description = "教育企业智能学员信息平台"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.dev"
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
