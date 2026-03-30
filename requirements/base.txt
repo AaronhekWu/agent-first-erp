@@ -1,0 +1,5 @@
+Django>=5.0,<6.0
+supabase>=2.0
+pydantic>=2.0
+python-dotenv>=1.0
+gunicorn>=22.0
