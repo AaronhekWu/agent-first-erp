@@ -1,84 +1,112 @@
 """
-Agent 服务
+AI 知识库服务
 
-提供会话管理、消息历史、Agent 配置等业务逻辑。
+提供知识库文档的 CRUD 和向量搜索接口。
+Agent 配置/会话/消息由后端 Claude 管理，不在此处理。
 """
 from uuid import UUID
 
-from apps.agents.models import Agent, Message, Session
-from apps.agents.repositories import (
-    AgentRepository,
-    MessageRepository,
-    SessionRepository,
-    ToolConfigRepository,
-)
+from apps.agents.models import KnowledgeDoc
+from apps.agents.repositories import EmbeddingRepository, KnowledgeDocRepository
+from apps.audits.services import AuditService
 
 
-class AgentService:
-    """Agent 服务：会话管理、消息历史"""
+class KnowledgeService:
+    """知识库服务：文档管理与向量搜索"""
 
     def __init__(
         self,
-        agent_repo: AgentRepository,
-        session_repo: SessionRepository,
-        message_repo: MessageRepository,
-        tool_config_repo: ToolConfigRepository,
+        doc_repo: KnowledgeDocRepository,
+        embedding_repo: EmbeddingRepository,
+        audit_service: AuditService,
     ):
-        self._agent_repo = agent_repo
-        self._session_repo = session_repo
-        self._message_repo = message_repo
-        self._tool_config_repo = tool_config_repo
+        self._doc_repo = doc_repo
+        self._embedding_repo = embedding_repo
+        self._audit = audit_service
 
-    # ---- Agent 配置 ----
+    # ---- 文档管理 ----
 
-    def get_agent(self, name: str) -> Agent | None:
-        """根据名称获取 Agent 配置"""
-        return self._agent_repo.get_active_by_name(name)
+    def get_doc(self, doc_id: UUID) -> KnowledgeDoc | None:
+        """获取文档"""
+        return self._doc_repo.get_by_id(doc_id)
 
-    def get_default_agent(self) -> Agent | None:
-        """获取默认 Agent"""
-        return self._agent_repo.get_active_by_name("default_assistant")
+    def list_docs(self, department: str | None = None, page: int = 1, page_size: int = 20):
+        """列出文档"""
+        filters = {}
+        if department:
+            filters["department"] = department
+        filters["is_active"] = True
+        return self._doc_repo.list(filters=filters, page=page, page_size=page_size)
 
-    # ---- 会话管理 ----
+    def get_department_docs(self, department: str) -> list[KnowledgeDoc]:
+        """获取部门知识库"""
+        return self._doc_repo.get_by_department(department)
 
-    def create_session(self, agent_id: UUID, user_id: UUID, channel: str, metadata: dict | None = None) -> Session:
-        """创建新会话"""
-        data = {
-            "agent_id": agent_id,
-            "user_id": user_id,
-            "channel": channel,
-            "metadata": metadata or {},
-        }
-        return self._session_repo.create(data)
+    def create_doc(self, data: dict, user_id: UUID | None = None) -> KnowledgeDoc:
+        """创建文档"""
+        if user_id:
+            data["created_by"] = user_id
+        doc = self._doc_repo.create(data)
+        self._audit.log_operation(
+            user_id=user_id,
+            action="create",
+            resource_type="knowledge_doc",
+            resource_id=doc.id,
+        )
+        return doc
 
-    def get_session(self, session_id: UUID) -> Session | None:
-        """获取会话"""
-        return self._session_repo.get_by_id(session_id)
+    def update_doc(self, doc_id: UUID, data: dict, user_id: UUID | None = None) -> KnowledgeDoc:
+        """更新文档"""
+        doc = self._doc_repo.update(doc_id, data)
+        self._audit.log_operation(
+            user_id=user_id,
+            action="update",
+            resource_type="knowledge_doc",
+            resource_id=doc_id,
+        )
+        return doc
 
-    def close_session(self, session_id: UUID) -> Session:
-        """关闭会话"""
-        return self._session_repo.close_session(session_id)
+    def deactivate_doc(self, doc_id: UUID, user_id: UUID | None = None) -> KnowledgeDoc:
+        """停用文档"""
+        doc = self._doc_repo.update(doc_id, {"is_active": False})
+        self._audit.log_operation(
+            user_id=user_id,
+            action="deactivate",
+            resource_type="knowledge_doc",
+            resource_id=doc_id,
+        )
+        return doc
 
-    def get_user_sessions(self, user_id: UUID) -> list[Session]:
-        """获取用户的活跃会话"""
-        return self._session_repo.get_active_by_user(user_id)
+    def search_docs(self, query: str) -> list[KnowledgeDoc]:
+        """按标题搜索文档"""
+        return self._doc_repo.search_by_title(query)
 
-    # ---- 消息管理 ----
+    # ---- 向量嵌入（预留接口，待后续 LLM 集成） ----
 
-    def get_messages(self, session_id: UUID, limit: int = 50) -> list[Message]:
-        """获取会话消息历史"""
-        return self._message_repo.get_by_session(session_id, limit)
+    def get_doc_embeddings(self, doc_id: UUID):
+        """获取文档的向量嵌入"""
+        return self._embedding_repo.get_by_doc(doc_id)
 
-    def add_message(self, session_id: UUID, role: str, content: str | None = None, **kwargs) -> Message:
-        """追加消息"""
-        return self._message_repo.append(session_id, role, content, **kwargs)
+    def reindex_doc(self, doc_id: UUID, chunks: list[dict]) -> int:
+        """
+        重新索引文档嵌入
 
-    # ---- 工具配置 ----
+        参数:
+            doc_id: 文档 ID
+            chunks: [{"chunk_text": "...", "embedding": [...], "metadata": {}}]
 
-    def get_tool_configs(self) -> list:
-        """获取所有活跃工具配置"""
-        return self._tool_config_repo.get_all_active()
-
-    def get_tool_config(self, name: str):
-        """根据名称获取工具配置"""
-        return self._tool_config_repo.get_active_by_name(name)
+        返回:
+            写入的嵌入块数量
+        """
+        # 清除旧嵌入
+        self._embedding_repo.delete_by_doc(doc_id)
+        # 写入新嵌入
+        for i, chunk in enumerate(chunks):
+            self._embedding_repo.create({
+                "doc_id": doc_id,
+                "chunk_index": i,
+                "chunk_text": chunk["chunk_text"],
+                "embedding": chunk.get("embedding"),
+                "metadata": chunk.get("metadata", {}),
+            })
+        return len(chunks)

@@ -27,6 +27,7 @@ class CourseTables:
     COURSES = "crs_courses"
     ENROLLMENTS = "crs_enrollments"
     ATTENDANCE = "crs_attendance"
+    COURSE_PRICES = "crs_course_prices"
 
 
 # 跟进模块
@@ -34,13 +35,25 @@ class FollowupTables:
     RECORDS = "flup_records"
 
 
-# Agent 模块
-class AgentTables:
-    AGENTS = "agt_agents"
-    PROMPT_TEMPLATES = "agt_prompt_templates"
-    SESSIONS = "agt_sessions"
-    MESSAGES = "agt_messages"
-    TOOL_CONFIGS = "agt_tool_configs"
+# 财务模块
+class FinanceTables:
+    ACCOUNTS = "fin_accounts"
+    TRANSACTIONS = "fin_transactions"
+    RECHARGES = "fin_recharges"
+    CONSUMPTION_LOGS = "fin_consumption_logs"
+    TRANSFERS = "fin_transfers"
+
+
+# 推广模块
+class PromoTables:
+    CAMPAIGNS = "promo_campaigns"
+    REFERRALS = "promo_referrals"
+
+
+# AI 模块
+class AITables:
+    KNOWLEDGE_DOCS = "ai_knowledge_docs"
+    EMBEDDINGS = "ai_embeddings"
 
 
 # 审计模块

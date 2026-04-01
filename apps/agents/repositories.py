@@ -1,109 +1,74 @@
 """
-Agent 模块仓库层
+AI 知识库仓库层
 """
 from uuid import UUID
 
 from supabase import Client
 
-from apps.core.constants import AgentTables
+from apps.core.constants import AITables
 from apps.core.repositories import BaseRepository
-from .models import Agent, Message, PromptTemplate, Session, ToolConfig
+from .models import Embedding, KnowledgeDoc
 
 
-class AgentRepository(BaseRepository[Agent]):
-    """Agent 配置仓库"""
-
-    def __init__(self, client: Client):
-        super().__init__(client, AgentTables.AGENTS, Agent)
-
-    def get_active_by_name(self, name: str) -> Agent | None:
-        """根据名称获取活跃的 Agent"""
-        resp = self._query().select("*").eq("name", name).eq("is_active", True).execute()
-        if not resp.data:
-            return None
-        return self._parse(resp.data[0])
-
-
-class PromptTemplateRepository(BaseRepository[PromptTemplate]):
-    """Prompt 模板仓库"""
+class KnowledgeDocRepository(BaseRepository[KnowledgeDoc]):
+    """知识库文档仓库"""
 
     def __init__(self, client: Client):
-        super().__init__(client, AgentTables.PROMPT_TEMPLATES, PromptTemplate)
+        super().__init__(client, AITables.KNOWLEDGE_DOCS, KnowledgeDoc)
 
-    def get_active_by_agent(self, agent_id: UUID) -> list[PromptTemplate]:
-        """获取 Agent 的活跃模板"""
+    def get_by_department(self, department: str) -> list[KnowledgeDoc]:
+        """获取部门的知识库文档"""
         resp = (
             self._query()
             .select("*")
-            .eq("agent_id", str(agent_id))
+            .eq("department", department)
             .eq("is_active", True)
-            .order("version", desc=True)
-            .execute()
-        )
-        return self._parse_list(resp.data)
-
-
-class SessionRepository(BaseRepository[Session]):
-    """会话仓库"""
-
-    def __init__(self, client: Client):
-        super().__init__(client, AgentTables.SESSIONS, Session)
-
-    def get_active_by_user(self, user_id: UUID) -> list[Session]:
-        """获取用户的活跃会话"""
-        resp = (
-            self._query()
-            .select("*")
-            .eq("user_id", str(user_id))
-            .eq("status", "active")
             .order("created_at", desc=True)
             .execute()
         )
         return self._parse_list(resp.data)
 
-    def close_session(self, session_id: UUID) -> Session:
-        """关闭会话"""
-        return self.update(session_id, {"status": "closed"})
-
-
-class MessageRepository(BaseRepository[Message]):
-    """消息仓库"""
-
-    def __init__(self, client: Client):
-        super().__init__(client, AgentTables.MESSAGES, Message)
-
-    def get_by_session(self, session_id: UUID, limit: int = 50) -> list[Message]:
-        """获取会话的消息历史（按时间正序）"""
+    def get_shared(self) -> list[KnowledgeDoc]:
+        """获取共享知识库文档"""
         resp = (
             self._query()
             .select("*")
-            .eq("session_id", str(session_id))
-            .order("created_at")
-            .limit(limit)
+            .eq("department", "shared")
+            .eq("is_active", True)
+            .order("created_at", desc=True)
             .execute()
         )
         return self._parse_list(resp.data)
 
-    def append(self, session_id: UUID, role: str, content: str | None = None, **kwargs) -> Message:
-        """追加消息到会话"""
-        data = {"session_id": str(session_id), "role": role, "content": content, **kwargs}
-        return self.create(data)
+    def search_by_title(self, query: str) -> list[KnowledgeDoc]:
+        """按标题搜索文档"""
+        resp = (
+            self._query()
+            .select("*")
+            .ilike("title", f"%{query}%")
+            .eq("is_active", True)
+            .execute()
+        )
+        return self._parse_list(resp.data)
 
 
-class ToolConfigRepository(BaseRepository[ToolConfig]):
-    """工具配置仓库"""
+class EmbeddingRepository(BaseRepository[Embedding]):
+    """向量嵌入仓库"""
 
     def __init__(self, client: Client):
-        super().__init__(client, AgentTables.TOOL_CONFIGS, ToolConfig)
+        super().__init__(client, AITables.EMBEDDINGS, Embedding)
 
-    def get_active_by_name(self, name: str) -> ToolConfig | None:
-        """根据名称获取活跃的工具配置"""
-        resp = self._query().select("*").eq("name", name).eq("is_active", True).execute()
-        if not resp.data:
-            return None
-        return self._parse(resp.data[0])
-
-    def get_all_active(self) -> list[ToolConfig]:
-        """获取所有活跃工具配置"""
-        resp = self._query().select("*").eq("is_active", True).execute()
+    def get_by_doc(self, doc_id: UUID) -> list[Embedding]:
+        """获取文档的所有嵌入块"""
+        resp = (
+            self._query()
+            .select("id, doc_id, chunk_index, chunk_text, metadata, created_at")
+            .eq("doc_id", str(doc_id))
+            .order("chunk_index")
+            .execute()
+        )
         return self._parse_list(resp.data)
+
+    def delete_by_doc(self, doc_id: UUID) -> None:
+        """删除文档的所有嵌入（重新索引前调用）"""
+        self._query().delete().eq("doc_id", str(doc_id)).execute()

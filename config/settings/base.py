@@ -36,6 +36,8 @@ INSTALLED_APPS = [
     "apps.agents",
     "apps.audits",
     "apps.tools",
+    "apps.finance",
+    "apps.promotions",
 ]
 
 # ============================================================

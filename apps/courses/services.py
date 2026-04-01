@@ -7,8 +7,8 @@ from typing import Any
 from uuid import UUID
 
 from apps.audits.services import AuditService
-from apps.courses.models import Attendance, Course, Enrollment
-from apps.courses.repositories import AttendanceRepository, CourseRepository, EnrollmentRepository
+from apps.courses.models import Attendance, Course, CoursePrice, Enrollment
+from apps.courses.repositories import AttendanceRepository, CoursePriceRepository, CourseRepository, EnrollmentRepository
 
 
 class CourseService:
@@ -20,11 +20,13 @@ class CourseService:
         enrollment_repo: EnrollmentRepository,
         attendance_repo: AttendanceRepository,
         audit_service: AuditService,
+        course_price_repo: CoursePriceRepository | None = None,
     ):
         self._course_repo = course_repo
         self._enrollment_repo = enrollment_repo
         self._attendance_repo = attendance_repo
         self._audit = audit_service
+        self._course_price_repo = course_price_repo
 
     # ---- 课程 ----
 
@@ -40,6 +42,28 @@ class CourseService:
             user_id=operator_id, action="create", resource_type="course", resource_id=course.id,
         )
         return course
+
+    # ---- 课程价格 ----
+
+    def create_course_price(self, course_id: UUID, data: dict[str, Any], user_id: UUID | None = None) -> CoursePrice:
+        """创建课程价格方案"""
+        data["course_id"] = course_id
+        if user_id:
+            data["created_by"] = user_id
+        price = self._course_price_repo.create(data)
+        if user_id:
+            self._audit.log_operation(
+                user_id=user_id, action="create", resource_type="course_price", resource_id=price.id,
+            )
+        return price
+
+    def get_course_prices(self, course_id: UUID) -> list[CoursePrice]:
+        """获取课程的所有有效价格方案"""
+        return self._course_price_repo.get_by_course(course_id)
+
+    def get_default_price(self, course_id: UUID) -> CoursePrice | None:
+        """获取课程的默认价格方案"""
+        return self._course_price_repo.get_default_price(course_id)
 
     # ---- 报名 ----
 

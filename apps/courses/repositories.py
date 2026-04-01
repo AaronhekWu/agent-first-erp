@@ -7,7 +7,7 @@ from supabase import Client
 
 from apps.core.constants import CourseTables
 from apps.core.repositories import BaseRepository, SoftDeleteRepository
-from .models import Attendance, Course, Enrollment
+from .models import Attendance, Course, CoursePrice, Enrollment
 
 
 class CourseRepository(SoftDeleteRepository[Course]):
@@ -15,6 +15,25 @@ class CourseRepository(SoftDeleteRepository[Course]):
 
     def __init__(self, client: Client):
         super().__init__(client, CourseTables.COURSES, Course)
+
+
+class CoursePriceRepository(BaseRepository[CoursePrice]):
+    """课程价格方案仓库"""
+
+    def __init__(self, client: Client):
+        super().__init__(client, CourseTables.COURSE_PRICES, CoursePrice)
+
+    def get_by_course(self, course_id: UUID) -> list[CoursePrice]:
+        """获取课程的所有价格方案"""
+        resp = self._query().select("*").eq("course_id", str(course_id)).eq("status", "active").order("is_default", desc=True).execute()
+        return self._parse_list(resp.data)
+
+    def get_default_price(self, course_id: UUID) -> CoursePrice | None:
+        """获取课程的默认价格方案"""
+        resp = self._query().select("*").eq("course_id", str(course_id)).eq("is_default", True).eq("status", "active").execute()
+        if not resp.data:
+            return None
+        return self._parse(resp.data[0])
 
 
 class EnrollmentRepository(BaseRepository[Enrollment]):
