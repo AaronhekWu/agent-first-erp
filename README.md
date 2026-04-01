@@ -15,34 +15,39 @@
 
 #### Supabase 数据库层（全部就绪）
 
-Supabase 项目 `nartypzacmsvfskcxfki`（ap-northeast-1）已完成 8 次迁移，20 张表已上线：
+Supabase 项目 `nartypzacmsvfskcxfki`（ap-northeast-1）已完成 9 次迁移，24 张表已上线：
 
 | 模块前缀 | 表 | 状态 |
 |---|---|---|
 | `acct_` | profiles / departments / roles / user_roles / user_departments | ✅ 已上线 |
 | `stu_` | students / parents / tags / student_tags | ✅ 已上线 |
-| `crs_` | courses / enrollments / attendance | ✅ 已上线 |
+| `crs_` | courses / **course_prices** / enrollments（扩展财务字段） / attendance | ✅ 已上线 |
 | `flup_` | records | ✅ 已上线 |
-| `agt_` | agents / prompt_templates / sessions / messages / tool_configs | ✅ 已上线 |
+| `fin_` | **accounts / transactions / recharges / consumption_logs / transfers** | ✅ 已上线 |
+| `promo_` | **campaigns / referrals** | ✅ 已上线 |
+| `ai_` | **knowledge_docs / embeddings**（pgvector RAG） | ✅ 已上线 |
 | `aud_` | operation_logs / agent_call_logs | ✅ 已上线 |
 
 - RLS 行级安全策略已配置（admin / teacher / counselor / viewer 四级角色）
-- 种子数据已写入（4 个默认角色、1 个默认 Agent `default_assistant`、6 个工具配置）
 - `auth.users` 触发器已配置（新用户注册自动创建 `acct_profiles`）
 - `pg_trgm` 模糊搜索、`moddatetime` 自动更新时间戳均已启用
+- `pgvector` 扩展已启用，HNSW 索引支持向量相似度搜索
+- 旧 `agt_*` 表已删除（Agent 配置/会话/消息由后端 Claude 管理）
 
 #### Django 服务层（骨架完成，待接 Supabase 凭证运行）
 
 ```
 apps/
 ├── core/         # Supabase 客户端、泛型 Repository、Pydantic 基础模型、依赖注入
-├── accounts/     # 用户档案、角色、部门（models + repositories + services + views）
+├── accounts/     # 用户档案、角色、部门
 ├── students/     # 学员、家长、标签（含模糊搜索）
-├── courses/      # 课程、报名、考勤统计
+├── courses/      # 课程、价格方案、报名（含财务字段）、考勤
 ├── followups/    # 跟进记录、待提醒查询
-├── agents/       # Agent 配置、会话、消息历史、工具配置
+├── finance/      # 学生账户、交易流水、充值、课消、转课
+├── promotions/   # 促销活动、老带新推荐
+├── agents/       # RAG 知识库文档、向量嵌入、工具执行接口
 ├── audits/       # 操作日志、Agent 调用日志（仅追加）
-└── tools/        # ToolGateway + 工具注册表 + student/followup/course 工具
+└── tools/        # ToolGateway + 工具注册表 + student/followup/course/finance 工具
 ```
 
 每个模块结构一致：`models.py → repositories.py → services.py → views.py + urls.py`
@@ -147,9 +152,11 @@ project-root/
 │   ├── core/                # 基础设施（db, constants, models, repositories, deps, middleware）
 │   ├── accounts/            # 用户、角色、部门
 │   ├── students/            # 学员（含模糊搜索）
-│   ├── courses/             # 课程、报名、考勤
+│   ├── courses/             # 课程、价格方案、报名、考勤
 │   ├── followups/           # 跟进记录
-│   ├── agents/              # AI Agent 配置、会话、消息
+│   ├── finance/             # 学生账户、交易流水、充值、课消、转课
+│   ├── promotions/          # 促销活动、老带新推荐
+│   ├── agents/              # RAG 知识库、向量嵌入、工具执行接口
 │   ├── audits/              # 审计日志（仅追加）
 │   └── tools/               # ToolGateway + 工具注册
 └── templates/               # Django 模板（待填充）
@@ -246,11 +253,14 @@ project-root/
 - [ ] reports 模块（学员统计 / 跟进统计 / 课程分析）
 - [ ] 报表导出审计
 
-### 阶段 4：可扩展 AI 能力（规划中）
+### 阶段 4：多 Agent 系统与 AI 能力
 
-- [ ] 向量检索（`pgvector` 扩展已在 Supabase 可用，需建表）
-- [ ] Prompt 配置页（前端）
-- [ ] 多模型路由（`agt_agents.model_id` 已预留字段）
+- [x] `pgvector` 扩展启用，知识库表 `ai_knowledge_docs` / `ai_embeddings` 已建
+- [x] RAG 知识库服务（KnowledgeService）已实现
+- [ ] **校长 Agent**（统管全局）+ 4 个部门 Sub-Agent（行政/市场/教学/财务）后端集成
+- [ ] 向量嵌入生成（接入 LLM Embedding API）
+- [ ] 部门知识库内容填充
+- [ ] 校区助手 AI 界面（预留接口已就绪，待后续实现）
 - [ ] 本地轻量模型插拔
 
 ---
@@ -272,8 +282,17 @@ project-root/
 | `GET` | `/api/v1/followups/<student_id>/` | 学员跟进历史 |
 | `POST` | `/api/v1/followups/create/` | 创建跟进记录 |
 | `GET` | `/api/v1/followups/reminders/` | 待发送提醒列表 |
-| `POST` | `/api/v1/agents/sessions/` | 创建 Agent 会话 |
-| `GET` | `/api/v1/agents/sessions/<id>/messages/` | 会话消息历史 |
+| `GET` | `/api/v1/finance/accounts/<student_id>/` | 学生账户余额 |
+| `GET` | `/api/v1/finance/transactions/<student_id>/` | 交易流水 |
+| `POST` | `/api/v1/finance/recharge/` | 充值 |
+| `GET` | `/api/v1/promotions/campaigns/` | 活跃促销活动列表 |
+| `GET` | `/api/v1/promotions/campaigns/<id>/` | 促销活动详情 |
+| `POST` | `/api/v1/promotions/campaigns/create/` | 创建促销活动 |
+| `POST` | `/api/v1/promotions/referrals/create/` | 创建老带新推荐 |
+| `GET` | `/api/v1/promotions/referrals/<student_id>/` | 学生推荐记录 |
+| `GET` | `/api/v1/agents/knowledge/` | 知识库文档列表 |
+| `GET` | `/api/v1/agents/knowledge/<id>/` | 知识库文档详情 |
+| `POST` | `/api/v1/agents/knowledge/create/` | 创建知识库文档 |
 | `POST` | `/api/v1/agents/tools/execute/` | 执行工具调用（ToolGateway） |
 | `GET` | `/api/v1/agents/tools/` | 可用工具列表 |
 | `GET` | `/api/v1/audits/operations/` | 操作日志查询 |
