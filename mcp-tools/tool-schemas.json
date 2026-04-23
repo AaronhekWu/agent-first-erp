@@ -1,0 +1,339 @@
+{
+  "tools": [
+    {
+      "name": "search_students",
+      "description": "根据姓名或手机号模糊搜索学员（支持中文模糊匹配）",
+      "rpc_function": "search_students_by_name",
+      "operation": "read",
+      "parameters": {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "搜索关键词（姓名或手机号）"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "返回结果数量上限",
+            "default": 10
+          }
+        }
+      }
+    },
+    {
+      "name": "get_student_detail",
+      "description": "获取学员全生命周期详情（基本信息、家长、标签、财务、报名、跟进、流水）",
+      "rpc_function": "rpc_get_student_lifecycle",
+      "operation": "read",
+      "parameters": {
+        "type": "object",
+        "required": ["student_id"],
+        "properties": {
+          "student_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "学员ID"
+          }
+        }
+      }
+    },
+    {
+      "name": "create_student",
+      "description": "创建新学员（含自动初始化财务账户和可选家长信息）",
+      "rpc_function": "rpc_create_student",
+      "operation": "write",
+      "confirm_before_execute": true,
+      "parameters": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "description": "学员姓名" },
+          "phone": { "type": "string", "description": "手机号" },
+          "gender": { "type": "string", "enum": ["男", "女"], "description": "性别" },
+          "birth_date": { "type": "string", "format": "date", "description": "出生日期 (YYYY-MM-DD)" },
+          "email": { "type": "string", "description": "邮箱" },
+          "school": { "type": "string", "description": "学校" },
+          "grade": { "type": "string", "description": "年级" },
+          "source": { "type": "string", "description": "来源渠道" },
+          "notes": { "type": "string", "description": "备注" },
+          "assigned_to": { "type": "string", "format": "uuid", "description": "负责顾问ID" },
+          "department_id": { "type": "string", "format": "uuid", "description": "部门ID" },
+          "parent_name": { "type": "string", "description": "家长姓名" },
+          "parent_phone": { "type": "string", "description": "家长手机号" },
+          "parent_relation": { "type": "string", "description": "与学员关系" }
+        }
+      }
+    },
+    {
+      "name": "update_student",
+      "description": "更新学员信息（仅更新提供的字段）",
+      "rpc_function": "rpc_update_student",
+      "operation": "write",
+      "confirm_before_execute": true,
+      "parameters": {
+        "type": "object",
+        "required": ["student_id"],
+        "properties": {
+          "student_id": { "type": "string", "format": "uuid", "description": "学员ID" },
+          "name": { "type": "string", "description": "姓名" },
+          "phone": { "type": "string", "description": "手机号" },
+          "gender": { "type": "string", "description": "性别" },
+          "school": { "type": "string", "description": "学校" },
+          "grade": { "type": "string", "description": "年级" },
+          "status": { "type": "string", "enum": ["active", "inactive", "graduated"], "description": "状态" },
+          "notes": { "type": "string", "description": "备注" }
+        }
+      }
+    },
+    {
+      "name": "recharge",
+      "description": "为学员账户充值（原子操作：锁账户→更新余额→写充值记录→写流水→审计）",
+      "rpc_function": "rpc_recharge",
+      "operation": "write",
+      "confirm_before_execute": true,
+      "parameters": {
+        "type": "object",
+        "required": ["student_id", "amount", "payment_method"],
+        "properties": {
+          "student_id": { "type": "string", "format": "uuid", "description": "学员ID" },
+          "amount": { "type": "number", "minimum": 0.01, "description": "充值金额" },
+          "payment_method": { "type": "string", "enum": ["cash", "wechat", "alipay", "bank_transfer", "other"], "description": "支付方式" },
+          "campaign_id": { "type": "string", "format": "uuid", "description": "关联促销活动ID" },
+          "bonus_amount": { "type": "number", "default": 0, "description": "赠送金额" },
+          "notes": { "type": "string", "description": "备注" }
+        }
+      }
+    },
+    {
+      "name": "refund",
+      "description": "为学员账户退费（原子操作：锁账户→校验余额→扣减→写流水→审计）",
+      "rpc_function": "rpc_refund",
+      "operation": "write",
+      "confirm_before_execute": true,
+      "parameters": {
+        "type": "object",
+        "required": ["student_id", "amount", "reason"],
+        "properties": {
+          "student_id": { "type": "string", "format": "uuid", "description": "学员ID" },
+          "amount": { "type": "number", "minimum": 0.01, "description": "退费金额" },
+          "reason": { "type": "string", "description": "退费原因" }
+        }
+      }
+    },
+    {
+      "name": "get_student_balance",
+      "description": "查询学员账户余额和财务概要",
+      "rpc_function": null,
+      "supabase_query": "fin_accounts?student_id=eq.{student_id}&select=*",
+      "operation": "read",
+      "parameters": {
+        "type": "object",
+        "required": ["student_id"],
+        "properties": {
+          "student_id": { "type": "string", "format": "uuid", "description": "学员ID" }
+        }
+      }
+    },
+    {
+      "name": "get_transaction_history",
+      "description": "查询学员交易流水记录",
+      "rpc_function": null,
+      "supabase_query": "fin_transactions?account_id=eq.{account_id}&select=*&order=created_at.desc&limit={limit}",
+      "operation": "read",
+      "parameters": {
+        "type": "object",
+        "required": ["student_id"],
+        "properties": {
+          "student_id": { "type": "string", "format": "uuid", "description": "学员ID" },
+          "limit": { "type": "integer", "default": 20, "description": "返回条数" }
+        }
+      }
+    },
+    {
+      "name": "enroll_student",
+      "description": "学员报名课程（含价格校验、防重复、促销折扣）",
+      "rpc_function": "rpc_enroll_student",
+      "operation": "write",
+      "confirm_before_execute": true,
+      "parameters": {
+        "type": "object",
+        "required": ["student_id", "course_id"],
+        "properties": {
+          "student_id": { "type": "string", "format": "uuid", "description": "学员ID" },
+          "course_id": { "type": "string", "format": "uuid", "description": "课程ID" },
+          "price_id": { "type": "string", "format": "uuid", "description": "价格方案ID（不传则用默认）" },
+          "campaign_id": { "type": "string", "format": "uuid", "description": "促销活动ID" },
+          "notes": { "type": "string", "description": "备注" },
+          "source": { "type": "string", "enum": ["normal", "trial", "referral", "transfer_in", "gift"], "description": "来源", "default": "normal" }
+        }
+      }
+    },
+    {
+      "name": "mark_attendance",
+      "description": "记录考勤（可选自动触发课消）",
+      "rpc_function": "rpc_mark_attendance",
+      "operation": "write",
+      "confirm_before_execute": true,
+      "parameters": {
+        "type": "object",
+        "required": ["enrollment_id", "class_date", "status"],
+        "properties": {
+          "enrollment_id": { "type": "string", "format": "uuid", "description": "报名记录ID" },
+          "class_date": { "type": "string", "format": "date", "description": "上课日期 (YYYY-MM-DD)" },
+          "status": { "type": "string", "enum": ["present", "absent", "late", "leave"], "description": "考勤状态" },
+          "trigger_consume": { "type": "boolean", "default": false, "description": "是否自动触发课消" },
+          "notes": { "type": "string", "description": "备注" }
+        }
+      }
+    },
+    {
+      "name": "consume_lesson",
+      "description": "手动课消（扣费+更新剩余课时+流水）",
+      "rpc_function": "rpc_consume_lesson",
+      "operation": "write",
+      "confirm_before_execute": true,
+      "parameters": {
+        "type": "object",
+        "required": ["enrollment_id"],
+        "properties": {
+          "enrollment_id": { "type": "string", "format": "uuid", "description": "报名记录ID" },
+          "lesson_count": { "type": "integer", "default": 1, "description": "消课数量" },
+          "unit_price": { "type": "number", "description": "课时单价（不传则用报名时的价格）" }
+        }
+      }
+    },
+    {
+      "name": "get_enrollments",
+      "description": "查询学员的课程报名信息",
+      "rpc_function": null,
+      "supabase_query": "crs_enrollments?student_id=eq.{student_id}&select=*,crs_courses(name,subject)",
+      "operation": "read",
+      "parameters": {
+        "type": "object",
+        "required": ["student_id"],
+        "properties": {
+          "student_id": { "type": "string", "format": "uuid", "description": "学员ID" }
+        }
+      }
+    },
+    {
+      "name": "create_followup",
+      "description": "创建学员跟进记录",
+      "rpc_function": "rpc_create_followup",
+      "operation": "write",
+      "confirm_before_execute": true,
+      "parameters": {
+        "type": "object",
+        "required": ["student_id", "type", "content"],
+        "properties": {
+          "student_id": { "type": "string", "format": "uuid", "description": "学员ID" },
+          "type": { "type": "string", "enum": ["phone", "wechat", "visit", "other"], "description": "跟进方式" },
+          "content": { "type": "string", "description": "跟进内容" },
+          "result": { "type": "string", "description": "跟进结果" },
+          "next_plan": { "type": "string", "description": "下次跟进计划" },
+          "next_date": { "type": "string", "format": "date-time", "description": "下次跟进日期 (ISO 8601)" }
+        }
+      }
+    },
+    {
+      "name": "get_followup_history",
+      "description": "获取学员跟进历史",
+      "rpc_function": null,
+      "supabase_query": "flup_records?student_id=eq.{student_id}&select=*,acct_profiles!created_by(display_name)&order=created_at.desc&limit={limit}",
+      "operation": "read",
+      "parameters": {
+        "type": "object",
+        "required": ["student_id"],
+        "properties": {
+          "student_id": { "type": "string", "format": "uuid", "description": "学员ID" },
+          "limit": { "type": "integer", "default": 20, "description": "返回条数" }
+        }
+      }
+    },
+    {
+      "name": "get_dashboard",
+      "description": "获取仪表盘概览数据（学员、财务、课程、跟进统计）",
+      "rpc_function": "rpc_get_dashboard_summary",
+      "operation": "read",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "date_from": { "type": "string", "format": "date", "description": "统计起始日期" },
+          "date_to": { "type": "string", "format": "date", "description": "统计截止日期" }
+        }
+      }
+    },
+    {
+      "name": "get_active_campaigns",
+      "description": "获取当前活跃的促销活动列表",
+      "rpc_function": null,
+      "supabase_query": "promo_campaigns?status=eq.active&or=(end_date.is.null,end_date.gte.{today})&select=*",
+      "operation": "read",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "create_course",
+      "description": "创建新课程",
+      "rpc_function": "rpc_create_course",
+      "operation": "write",
+      "confirm_before_execute": true,
+      "parameters": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "description": "课程名称" },
+          "subject": { "type": "string", "description": "学科" },
+          "level": { "type": "string", "description": "难度等级" },
+          "description": { "type": "string", "description": "课程描述" },
+          "max_capacity": { "type": "integer", "description": "最大容量" },
+          "fee": { "type": "number", "description": "默认课时费" },
+          "start_date": { "type": "string", "format": "date", "description": "开课日期" },
+          "end_date": { "type": "string", "format": "date", "description": "结课日期" },
+          "department_id": { "type": "string", "format": "uuid", "description": "所属部门" }
+        }
+      }
+    },
+    {
+      "name": "create_campaign",
+      "description": "创建促销活动",
+      "rpc_function": "rpc_create_campaign",
+      "operation": "write",
+      "confirm_before_execute": true,
+      "parameters": {
+        "type": "object",
+        "required": ["name", "type"],
+        "properties": {
+          "name": { "type": "string", "description": "活动名称" },
+          "type": { "type": "string", "description": "活动类型" },
+          "description": { "type": "string", "description": "活动描述" },
+          "discount_type": { "type": "string", "enum": ["percentage", "fixed"], "description": "折扣类型" },
+          "discount_value": { "type": "number", "description": "折扣值" },
+          "gift_lessons": { "type": "integer", "default": 0, "description": "赠送课时" },
+          "start_date": { "type": "string", "format": "date", "description": "开始日期" },
+          "end_date": { "type": "string", "format": "date", "description": "结束日期" },
+          "max_usage": { "type": "integer", "description": "最大使用次数" }
+        }
+      }
+    },
+    {
+      "name": "transfer_counselor",
+      "description": "转移学员顾问",
+      "rpc_function": "rpc_transfer_counselor",
+      "operation": "write",
+      "confirm_before_execute": true,
+      "parameters": {
+        "type": "object",
+        "required": ["student_id", "new_counselor"],
+        "properties": {
+          "student_id": { "type": "string", "format": "uuid", "description": "学员ID" },
+          "new_counselor": { "type": "string", "format": "uuid", "description": "新顾问用户ID" },
+          "reason": { "type": "string", "description": "转移原因" }
+        }
+      }
+    }
+  ]
+}
