@@ -5,7 +5,6 @@ out
 .env.local
 .env.*.local
 *.tsbuildinfo
-next-env.d.ts
 
 # --- 本地遗留资产 (保留在磁盘, 不上 git) ---
 # 旧 Django 后端 (业务逻辑已全迁到 Supabase RPC + Edge Function)
@@ -19,8 +18,9 @@ requirements/
 # DB 迁移 SQL / Edge Function 源码 / 项目文档 / MCP 配置
 # (都已 apply 到生产 Supabase / 或仅本机/AI 用)
 migrations/
-supabase/
+/supabase/
 docs/
+!lib/supabase/
 .mcp.json
 
 # --- 工具产物 ---
