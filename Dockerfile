@@ -4,14 +4,18 @@
 # 3. runner   : 最小运行时 (alpine + node + 必要静态文件)
 #
 # 镜像最终 ~150MB, 启动 < 1s
+#
+# Base image 走 DaoCloud 镜像加速 (国内 CI 构建机直连 docker.io 会 timeout)
+# ARG 暴露出来便于本地或海外环境覆盖: --build-arg NODE_IMAGE=node:20-alpine
+ARG NODE_IMAGE=docker.m.daocloud.io/library/node:20-alpine
 
-FROM node:20-alpine AS deps
+FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm ci --no-audit --no-fund
 
-FROM node:20-alpine AS builder
+FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -23,7 +27,7 @@ ENV NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
 RUN npm run build
 
-FROM node:20-alpine AS runner
+FROM ${NODE_IMAGE} AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
