@@ -20,7 +20,9 @@ next-env.d.ts
 # DB 迁移 SQL / Edge Function 源码 / 项目文档 / MCP 配置
 # (都已 apply 到生产 Supabase / 或仅本机/AI 用)
 /migrations/
-/supabase/
+# supabase/ 下默认忽略, 但纳管 migrations/ (版本化 DB 变更, 与生产同步)
+/supabase/*
+!/supabase/migrations/
 /docs/
 /.mcp.json
 
