@@ -5,7 +5,10 @@ export interface MeResult {
   user: CurrentUser;
   /** 显式权限 (dot 格式). 为空时由 PermissionsProvider 回退到角色默认权限. */
   permissions?: string[];
-  email: string | null;
+  /** 账号是否启用 */
+  isActive: boolean;
+  /** 是否已分配角色 (无角色 → 待管理员分配, 无任何数据访问) */
+  hasRole: boolean;
 }
 
 interface RpcMe {
@@ -19,9 +22,9 @@ interface RpcMe {
 }
 
 /**
- * 解析当前登录用户 (供 layout 注入前端权限上下文). 未登录或停用 → null.
- * 角色来自 rpc_get_me (DB 内 get_my_role 解析 acct_user_roles / JWT);
- * permissions 为 acct_profiles.permissions 的逐人覆盖, 为空则交给前端按角色取默认.
+ * 解析当前登录用户. 返回 null 仅代表「无会话」.
+ * 已登录但 未分配角色 / 已停用 的情况由 isActive / hasRole 标记, 交给 layout 显示待审批页.
+ * 角色来自 rpc_get_me (DB 内 get_my_role 解析 acct_user_roles / JWT).
  */
 export async function getMe(): Promise<MeResult | null> {
   const sb = createServerSupabase();
@@ -33,7 +36,6 @@ export async function getMe(): Promise<MeResult | null> {
   const { data, error } = await sb.rpc("rpc_get_me");
   if (error || !data) return null;
   const me = data as RpcMe;
-  if (me.is_active === false) return null;
 
   const explicit = Array.isArray(me.permissions) ? me.permissions : [];
   return {
@@ -44,6 +46,7 @@ export async function getMe(): Promise<MeResult | null> {
       email: me.email,
     },
     permissions: explicit.length > 0 ? explicit : undefined,
-    email: me.email,
+    isActive: me.is_active !== false,
+    hasRole: !!me.role,
   };
 }
