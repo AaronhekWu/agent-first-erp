@@ -25,6 +25,10 @@ ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+# 服务端(含 middleware)访问 Supabase 的 VPC 内网地址 — 构建期注入以便 middleware 内联.
+# 默认即生产 VPC 地址; 可用 --build-arg 覆盖.
+ARG SUPABASE_SERVER_URL=http://172.23.91.48:80
+ENV SUPABASE_SERVER_URL=${SUPABASE_SERVER_URL}
 RUN npm run build
 
 FROM ${NODE_IMAGE} AS runner
@@ -33,6 +37,10 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+# 运行时服务端访问 Supabase 的 VPC 内网地址 (server component 运行时读取);
+# 可被 SAE 环境变量覆盖.
+ARG SUPABASE_SERVER_URL=http://172.23.91.48:80
+ENV SUPABASE_SERVER_URL=${SUPABASE_SERVER_URL}
 
 # Next.js standalone 包含运行所需的最小 node_modules 子集
 COPY --from=builder /app/public ./public
