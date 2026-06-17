@@ -25,6 +25,7 @@ next-env.d.ts
 !/supabase/migrations/
 /docs/
 /.mcp.json
+/.codex/config.toml
 
 # --- 工具产物 ---
 .claude/

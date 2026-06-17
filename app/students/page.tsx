@@ -2,6 +2,7 @@ import { KpiCards } from "@/components/students/kpi-cards";
 import { StudentFilters } from "@/components/students/student-filters";
 import { StudentTable } from "@/components/students/student-table";
 import { NewStudentButton } from "@/components/students/new-student-button";
+import { Gate } from "@/lib/auth/permissions-context";
 import {
   getLookups,
   getStudentKpis,
@@ -58,7 +59,9 @@ export default async function StudentsPage({ searchParams }: PageProps) {
             面向后台列表场景：先筛选，再查看，再进入详情
           </p>
         </div>
-        <NewStudentButton counselors={counselors} departments={departments} />
+        <Gate keys="students.create">
+          <NewStudentButton counselors={counselors} departments={departments} />
+        </Gate>
       </div>
 
       <KpiCards kpis={kpis} />

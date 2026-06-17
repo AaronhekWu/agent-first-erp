@@ -17,6 +17,10 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
   const [keyword, setKeyword] = useState("");
   const [results, setResults] = useState<StudentSearchResult[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [source, setSource] = useState("manual");
+  const [priceId, setPriceId] = useState("");
+  const [campaignId, setCampaignId] = useState("");
+  const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const alreadyIn = new Set(enrollments.map((e) => e.student_id));
@@ -46,7 +50,14 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
     setError(null);
     setInfo(null);
     try {
-      await enrollStudent({ p_student_id: s.id, p_course_id: course.course_id, p_source: "manual" });
+      await enrollStudent({
+        p_student_id: s.id,
+        p_course_id: course.course_id,
+        p_source: source,
+        p_price_id: priceId.trim() || null,
+        p_campaign_id: campaignId.trim() || null,
+        p_notes: notes.trim() || null,
+      });
       setInfo(`已为 ${s.name} 报课`);
       await onMutate();
     } catch (e) {
@@ -59,7 +70,8 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
   return (
     <div>
       <div className="rounded-lg bg-slate-50 p-4">
-        <div className="relative">
+        <div className="grid gap-3 lg:grid-cols-[1fr_160px_160px_160px]">
+          <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             value={keyword}
@@ -67,7 +79,36 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
             placeholder="按姓名 / 手机号 / 学员编号搜索"
             className="h-10 w-full rounded-md border border-slate-200 bg-white pl-10 pr-3 text-sm focus:border-brand-500 focus:outline-none"
           />
+          </div>
+          <select
+            value={source}
+            onChange={(e) => setSource(e.target.value)}
+            className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm focus:border-brand-500 focus:outline-none"
+          >
+            <option value="manual">正常报课</option>
+            <option value="transfer">转课补录</option>
+            <option value="campaign">促销优惠</option>
+            <option value="referral">老带新</option>
+          </select>
+          <input
+            value={priceId}
+            onChange={(e) => setPriceId(e.target.value)}
+            placeholder="价格方案ID"
+            className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm focus:border-brand-500 focus:outline-none"
+          />
+          <input
+            value={campaignId}
+            onChange={(e) => setCampaignId(e.target.value)}
+            placeholder="优惠活动ID"
+            className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm focus:border-brand-500 focus:outline-none"
+          />
         </div>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="优惠/转课说明，例如：暑期班 9 折、老带新减免 200 元、A 课程剩余课时转入"
+          className="mt-3 min-h-16 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+        />
         {error && <div className="mt-2 rounded bg-red-50 px-3 py-1.5 text-xs text-red-600">{error}</div>}
         {info && <div className="mt-2 rounded bg-emerald-50 px-3 py-1.5 text-xs text-emerald-700">{info}</div>}
       </div>

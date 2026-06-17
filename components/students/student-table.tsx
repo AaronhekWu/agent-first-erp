@@ -27,6 +27,8 @@ import {
 } from "@/lib/format";
 import { StatusBadge } from "./status-badge";
 import { StudentDrawer } from "./student-drawer";
+import { Gate } from "@/lib/auth/permissions-context";
+import { requestApproval } from "@/lib/api/approvals-client";
 import type { StudentRow } from "@/lib/api/students";
 
 interface Props {
@@ -100,6 +102,25 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
         `\n\n该批量操作已收敛到 Edge Function 路径，待接入后将真实执行。`,
     );
 
+  const requestStudentDelete = async (student: StudentRow) => {
+    const reason = prompt(`请填写删除学员「${student.name}」的审批原因`);
+    if (reason === null) return;
+    if (!reason.trim()) return alert("审批原因必填");
+    try {
+      await requestApproval({
+        type: "student_delete",
+        title: `删除学员审批：${student.name}`,
+        reason: reason.trim(),
+        targetId: student.id,
+        targetLabel: student.name,
+        payload: { p_student_id: student.id },
+      });
+      alert("已提交删除学员审批");
+    } catch (e) {
+      alert((e as Error).message);
+    }
+  };
+
   return (
     <div className="rounded-2xl bg-white shadow-card">
       {/* Toolbar */}
@@ -120,7 +141,9 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
             <BatchBtn icon={UserCog} label="批量转移顾问" onClick={() => batchAction("批量转移顾问")} />
             <BatchBtn icon={Mail} label="批量发短信" onClick={() => batchAction("批量发短信")} />
             <BatchBtn icon={Download} label="导出选中" onClick={() => batchAction("导出选中学员")} />
-            <BatchBtn icon={Trash2} label="批量删除" danger onClick={() => batchAction("批量删除")} />
+            <Gate keys="students.delete">
+              <BatchBtn icon={Trash2} label="批量删除" danger onClick={() => batchAction("批量删除")} />
+            </Gate>
           </div>
         </div>
       ) : (
@@ -288,18 +311,30 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="flex items-center justify-end gap-1">
-                    <Link
-                      href={`/students/${r.id}`}
-                      className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50"
-                    >
-                      查看详情
-                    </Link>
-                    <button
-                      onClick={() => alert("充值功能即将上线")}
-                      className="rounded bg-amber-50 border border-amber-200 px-2 py-1 text-xs text-amber-700 hover:bg-amber-100"
-                    >
-                      充值
-                    </button>
+                    <Gate keys="students.view">
+                      <Link
+                        href={`/students/${r.id}`}
+                        className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50"
+                      >
+                        查看详情
+                      </Link>
+                    </Gate>
+                    <Gate keys="finance.recharge">
+                      <button
+                        onClick={() => alert("充值功能即将上线")}
+                        className="rounded bg-amber-50 border border-amber-200 px-2 py-1 text-xs text-amber-700 hover:bg-amber-100"
+                      >
+                        充值
+                      </button>
+                    </Gate>
+                    <Gate keys="students.delete">
+                      <button
+                        onClick={() => requestStudentDelete(r)}
+                        className="rounded border border-red-100 bg-red-50 px-2 py-1 text-xs text-red-600 hover:bg-red-100"
+                      >
+                        删除
+                      </button>
+                    </Gate>
                   </div>
                 </td>
               </tr>

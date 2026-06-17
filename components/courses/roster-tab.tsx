@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { LogOut, ArrowRightLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency, maskPhone } from "@/lib/format";
-import { dropEnrollment, transferEnrollment } from "@/lib/api/create";
+import { requestApproval } from "@/lib/api/approvals-client";
 import { listActiveCourseOptions } from "@/lib/api/courses-client";
 import type { ActiveCourseOption, CourseEnrollment, CourseRow } from "@/lib/api/courses";
 
@@ -178,10 +178,18 @@ function DropConfirmModal({
               setSubmitting(true);
               setError(null);
               try {
-                await dropEnrollment({
-                  p_enrollment_id: enrollment.enrollment_id,
-                  p_refund_remaining: refund,
-                  p_reason: reason.trim() || null,
+                await requestApproval({
+                  type: "enrollment_drop",
+                  title: `退课审批：${enrollment.student_name}`,
+                  reason: reason.trim() || "未填写退课原因",
+                  targetId: enrollment.enrollment_id,
+                  targetLabel: enrollment.student_name,
+                  amount: refundAmount,
+                  payload: {
+                    p_enrollment_id: enrollment.enrollment_id,
+                    p_refund_remaining: refund,
+                    p_reason: reason.trim() || null,
+                  },
                 });
                 await onDone();
               } catch (e) {
@@ -192,7 +200,7 @@ function DropConfirmModal({
             }}
             className="h-9 rounded-md bg-red-500 px-4 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50"
           >
-            {submitting ? "处理中…" : "确认退课"}
+            {submitting ? "提交中…" : "提交退课审批"}
           </button>
         </div>
       </div>
@@ -286,11 +294,18 @@ function TransferModal({
               setSubmitting(true);
               setError(null);
               try {
-                await transferEnrollment({
-                  p_source_enrollment_id: enrollment.enrollment_id,
-                  p_target_course_id: targetId,
-                  p_carry_lessons: Number(carry),
-                  p_reason: reason.trim() || null,
+                await requestApproval({
+                  type: "enrollment_transfer",
+                  title: `转课审批：${enrollment.student_name}`,
+                  reason: reason.trim() || "未填写转课原因",
+                  targetId: enrollment.enrollment_id,
+                  targetLabel: enrollment.student_name,
+                  payload: {
+                    p_source_enrollment_id: enrollment.enrollment_id,
+                    p_target_course_id: targetId,
+                    p_carry_lessons: Number(carry),
+                    p_reason: reason.trim() || null,
+                  },
                 });
                 await onDone();
               } catch (e) {
@@ -301,7 +316,7 @@ function TransferModal({
             }}
             className="h-9 rounded-md bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
           >
-            {submitting ? "处理中…" : "确认转课"}
+            {submitting ? "提交中…" : "提交转课审批"}
           </button>
         </div>
       </div>

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { ChevronRight, ChevronDown, Plus, Edit2, Trash2, Crown, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { deleteDepartment } from "@/lib/api/create";
+import { requestApproval } from "@/lib/api/approvals-client";
 import { DepartmentEditModal } from "./department-edit-modal";
 import type { DepartmentDetail, StaffRow } from "@/lib/api/campus";
 
@@ -53,7 +53,11 @@ export function DepartmentTree({ departments, staff }: Props) {
     () => new Set(departments.map((d) => d.id)),
   );
   const [editing, setEditing] = useState<DepartmentDetail | "new" | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(departments[0]?.id ?? null);
   const [busy, setBusy] = useState(false);
+  const selected = departments.find((d) => d.id === selectedId) ?? departments[0] ?? null;
+  const selectedMembers = selected ? staff.filter((s) => s.is_active && s.department_id === selected.id) : [];
+  const selectedChildren = selected ? departments.filter((d) => d.parent_id === selected.id) : [];
 
   const toggle = (id: string) =>
     setExpanded((cur) => {
@@ -64,10 +68,20 @@ export function DepartmentTree({ departments, staff }: Props) {
     });
 
   const handleDelete = async (d: DepartmentDetail) => {
-    if (!confirm(`确认删除部门「${d.name}」？`)) return;
+    const reason = prompt(`请填写删除部门「${d.name}」的审批原因`);
+    if (reason === null) return;
+    if (!reason.trim()) return alert("审批原因必填");
     setBusy(true);
     try {
-      await deleteDepartment(d.id);
+      await requestApproval({
+        type: "department_delete",
+        title: `删除部门审批：${d.name}`,
+        reason: reason.trim(),
+        targetId: d.id,
+        targetLabel: d.name,
+        payload: { p_id: d.id },
+      });
+      alert("已提交删除部门审批");
       router.refresh();
     } catch (e) {
       alert((e as Error).message);
@@ -91,7 +105,24 @@ export function DepartmentTree({ departments, staff }: Props) {
         </button>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white">
+      {tree.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-amber-300 bg-amber-50 px-5 py-8 text-center">
+          <div className="text-sm font-medium text-amber-800">暂无部门架构</div>
+          <div className="mt-1 text-sm text-amber-700">
+            请先新增“总部”，再添加教学部、销售部、行政部等子部门。生产库可通过 `acct_departments` 种子数据初始化。
+          </div>
+          <button
+            onClick={() => setEditing("new")}
+            className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-md bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700"
+          >
+            <Plus className="h-4 w-4" /> 新增第一个部门
+          </button>
+        </div>
+      ) : (
+        <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+          <div className="space-y-4">
+            <OrgChart nodes={tree} selectedId={selected?.id ?? null} onSelect={setSelectedId} />
+            <div className="rounded-lg border border-slate-200 bg-white">
         {tree.length === 0 && (
           <div className="px-5 py-12 text-center text-sm text-slate-400">暂无部门</div>
         )}
@@ -102,12 +133,49 @@ export function DepartmentTree({ departments, staff }: Props) {
             depth={0}
             expanded={expanded}
             toggle={toggle}
+            selectedId={selected?.id ?? null}
+            onSelect={setSelectedId}
             onEdit={(d) => setEditing(d)}
             onDelete={handleDelete}
             busy={busy}
           />
         ))}
+            </div>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <div className="text-sm font-medium text-slate-800">部门详情</div>
+            {selected ? (
+              <div className="mt-4 space-y-3 text-sm">
+                <div>
+                  <div className="text-xs text-slate-400">部门名称</div>
+                  <div className="font-medium text-slate-900">{selected.name}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-400">说明</div>
+                  <div className="text-slate-600">{selected.description ?? "—"}</div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Stat label="成员" value={selectedMembers.length} />
+                  <Stat label="子部门" value={selectedChildren.length} />
+                </div>
+                <div>
+                  <div className="mb-2 text-xs text-slate-400">成员</div>
+                  <div className="space-y-1">
+                    {selectedMembers.length === 0 && <div className="text-slate-400">暂无成员</div>}
+                    {selectedMembers.slice(0, 8).map((m) => (
+                      <div key={m.id} className="rounded bg-slate-50 px-2 py-1 text-slate-600">
+                        {m.display_name} {m.primary_role ? `· ${m.primary_role}` : ""}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-6 text-sm text-slate-400">选择一个部门查看详情</div>
+            )}
+          </div>
       </div>
+      )}
 
       <DepartmentEditModal
         open={editing !== null}
@@ -121,12 +189,14 @@ export function DepartmentTree({ departments, staff }: Props) {
 }
 
 function TreeRow({
-  node, depth, expanded, toggle, onEdit, onDelete, busy,
+  node, depth, expanded, toggle, selectedId, onSelect, onEdit, onDelete, busy,
 }: {
   node: TreeNode;
   depth: number;
   expanded: Set<string>;
   toggle: (id: string) => void;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
   onEdit: (d: DepartmentDetail) => void;
   onDelete: (d: DepartmentDetail) => void;
   busy: boolean;
@@ -136,7 +206,7 @@ function TreeRow({
   return (
     <div className="border-b border-slate-100 last:border-b-0">
       <div
-        className="flex items-center gap-2 px-3 py-2.5 hover:bg-slate-50"
+        className={cn("flex items-center gap-2 px-3 py-2.5 hover:bg-slate-50", selectedId === node.id && "bg-brand-50")}
         style={{ paddingLeft: 12 + depth * 24 }}
       >
         {hasKids ? (
@@ -149,7 +219,9 @@ function TreeRow({
         ) : (
           <span className="inline-block h-5 w-5" />
         )}
-        <span className="text-sm font-medium text-slate-800">{node.name}</span>
+        <button onClick={() => onSelect(node.id)} className="text-sm font-medium text-slate-800 hover:text-brand-600">
+          {node.name}
+        </button>
         {node.manager && (
           <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700">
             <Crown className="h-3 w-3" /> 主管: {node.manager.display_name}
@@ -211,6 +283,8 @@ function TreeRow({
               depth={depth + 1}
               expanded={expanded}
               toggle={toggle}
+              selectedId={selectedId}
+              onSelect={onSelect}
               onEdit={onEdit}
               onDelete={onDelete}
               busy={busy}
@@ -218,6 +292,53 @@ function TreeRow({
           ))}
         </>
       )}
+    </div>
+  );
+}
+
+function OrgChart({ nodes, selectedId, onSelect }: { nodes: TreeNode[]; selectedId: string | null; onSelect: (id: string) => void }) {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-4">
+      <div className="flex min-w-max items-start gap-4">
+        {nodes.map((node) => (
+          <OrgNode key={node.id} node={node} selectedId={selectedId} onSelect={onSelect} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OrgNode({ node, selectedId, onSelect }: { node: TreeNode; selectedId: string | null; onSelect: (id: string) => void }) {
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <button
+        onClick={() => onSelect(node.id)}
+        className={cn(
+          "min-w-36 rounded-lg border px-3 py-2 text-center shadow-sm",
+          selectedId === node.id
+            ? "border-brand-300 bg-brand-50 text-brand-700"
+            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+        )}
+      >
+        <div className="text-sm font-medium">{node.name}</div>
+        <div className="mt-1 text-xs text-slate-400">{node.members.length} 人</div>
+      </button>
+      {node.children.length > 0 && (
+        <div className="flex items-start gap-3 border-t border-slate-200 pt-3">
+          {node.children.map((child) => (
+            <OrgNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded bg-slate-50 px-3 py-2">
+      <div className="text-xs text-slate-400">{label}</div>
+      <div className="mt-1 text-lg font-semibold text-slate-900">{value}</div>
     </div>
   );
 }

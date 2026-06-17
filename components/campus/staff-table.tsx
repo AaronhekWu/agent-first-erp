@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Edit2, Plus, Trash2, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { deleteStaff } from "@/lib/api/create";
+import { requestApproval } from "@/lib/api/approvals-client";
 import { maskPhone } from "@/lib/format";
 import { StaffEditModal } from "./staff-edit-modal";
 import type { DepartmentDetail, StaffRow } from "@/lib/api/campus";
@@ -47,9 +47,19 @@ export function StaffTable({ staff, departments }: Props) {
   });
 
   const handleDelete = async (s: StaffRow) => {
-    if (!confirm(`确认停用「${s.display_name}」？停用后将无法登录。`)) return;
+    const reason = prompt(`请填写停用「${s.display_name}」的审批原因`);
+    if (reason === null) return;
+    if (!reason.trim()) return alert("审批原因必填");
     try {
-      await deleteStaff(s.id);
+      await requestApproval({
+        type: "staff_deactivate",
+        title: `停用员工审批：${s.display_name}`,
+        reason: reason.trim(),
+        targetId: s.id,
+        targetLabel: s.display_name,
+        payload: { p_id: s.id },
+      });
+      alert("已提交停用员工审批");
       router.refresh();
     } catch (e) {
       alert((e as Error).message);

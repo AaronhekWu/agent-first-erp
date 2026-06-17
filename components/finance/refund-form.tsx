@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Undo2 } from "lucide-react";
 import { Field, inputCls, textareaCls } from "@/components/ui/form";
 import { StudentPicker } from "./student-picker";
-import { refund } from "@/lib/api/create";
+import { requestApproval } from "@/lib/api/approvals-client";
 import { formatCurrency } from "@/lib/format";
 import type { StudentSearchResult } from "@/lib/api/courses";
 
@@ -27,8 +27,16 @@ export function RefundForm() {
     setError(null);
     setInfo(null);
     try {
-      await refund({ p_student_id: student.id, p_amount: n, p_reason: reason.trim() });
-      setInfo(`已为 ${student.name} 退费 ${formatCurrency(n)}`);
+      await requestApproval({
+        type: "finance_refund",
+        title: `退费审批：${student.name}`,
+        reason: reason.trim(),
+        targetId: student.id,
+        targetLabel: student.name,
+        amount: n,
+        payload: { p_student_id: student.id, p_amount: n, p_reason: reason.trim() },
+      });
+      setInfo(`已提交 ${student.name} 的退费审批 ${formatCurrency(n)}`);
       setStudent(null);
       setAmount("");
       setReason("");
@@ -75,7 +83,7 @@ export function RefundForm() {
         disabled={submitting}
         className="inline-flex h-10 items-center gap-1.5 rounded-md bg-amber-500 px-5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
       >
-        {submitting ? "提交中…" : "确认退费"}
+        {submitting ? "提交中…" : "提交退费审批"}
       </button>
     </div>
   );
