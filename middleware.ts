@@ -1,5 +1,10 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  SUPABASE_SERVER_URL,
+  SUPABASE_ANON_KEY,
+  SUPABASE_STORAGE_KEY,
+} from "@/lib/supabase/config";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
@@ -13,9 +18,10 @@ export async function middleware(req: NextRequest) {
   const res = NextResponse.next({ request: req });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    SUPABASE_SERVER_URL,
+    SUPABASE_ANON_KEY,
     {
+      auth: { storageKey: SUPABASE_STORAGE_KEY },
       cookies: {
         getAll: () => req.cookies.getAll(),
         setAll: (list: CookieToSet[]) => {
