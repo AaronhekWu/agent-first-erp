@@ -6,9 +6,16 @@ import { useRouter, useSelectedLayoutSegments } from "next/navigation";
 import { Bell, CheckSquare, Clock, HelpCircle, Menu, Search, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { searchStudents } from "@/lib/api/courses-client";
+import { getNotifications, type NotificationItem } from "@/lib/api/notifications-client";
 import { useLayout } from "./layout-context";
 import { UserMenu } from "./user-menu";
 import type { StudentSearchResult } from "@/lib/api/courses";
+
+const NOTICE_ICON: Record<NotificationItem["kind"], typeof Bell> = {
+  approval: CheckSquare,
+  balance: Wallet,
+  followup: Clock,
+};
 
 const SEGMENT_LABELS: Record<string, string> = {
   dashboard: "仪表盘",
@@ -60,7 +67,19 @@ export function Topbar() {
   const [results, setResults] = useState<StudentSearchResult[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [noticeOpen, setNoticeOpen] = useState(false);
+  const [notices, setNotices] = useState<NotificationItem[]>([]);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // 进入时拉一次通知; 打开面板时刷新
+  useEffect(() => {
+    let cancelled = false;
+    void getNotifications().then((d) => {
+      if (!cancelled) setNotices(d.items);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [noticeOpen]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -203,9 +222,13 @@ export function Topbar() {
           aria-label="通知"
         >
           <Bell className="h-5 w-5" />
-          <span className="absolute -right-0.5 -top-0.5 grid h-4 w-4 place-items-center rounded-full bg-red-500 text-[10px] font-medium text-white">3</span>
+          {notices.length > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 grid h-4 w-4 place-items-center rounded-full bg-red-500 text-[10px] font-medium text-white">
+              {notices.length > 9 ? "9+" : notices.length}
+            </span>
+          )}
         </button>
-        {noticeOpen && <NotificationsPanel />}
+        {noticeOpen && <NotificationsPanel items={notices} onNavigate={() => setNoticeOpen(false)} />}
         <button
           type="button"
           className="grid h-9 w-9 place-items-center rounded-md text-slate-500 hover:bg-slate-100"
@@ -218,31 +241,44 @@ export function Topbar() {
   );
 }
 
-function NotificationsPanel() {
-  const items = [
-    { href: "/audits", Icon: CheckSquare, title: "待审批操作", desc: "退费、退课、删除等高风险操作将在审批中心处理" },
-    { href: "/followups", Icon: Clock, title: "跟进到期提醒", desc: "查看到期未跟进学员与跟进时间线" },
-    { href: "/finance", Icon: Wallet, title: "余额预警", desc: "检查低余额学员并发起充值建议" },
-  ];
+function NotificationsPanel({
+  items,
+  onNavigate,
+}: {
+  items: NotificationItem[];
+  onNavigate: () => void;
+}) {
   return (
     <div className="absolute right-20 top-14 z-30 w-80 rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
       <div className="flex items-center justify-between px-2 py-2">
         <div className="text-sm font-medium text-slate-800">通知</div>
-        <div className="text-xs text-slate-400">数据源接入中</div>
+        <div className="text-xs text-slate-400">{items.length} 条待处理</div>
       </div>
-      <div className="space-y-1">
-        {items.map(({ href, Icon, title, desc }) => (
-          <Link key={href} href={href} className="flex gap-3 rounded-md px-2 py-2 hover:bg-slate-50">
-            <span className="mt-0.5 grid h-8 w-8 place-items-center rounded-md bg-slate-100 text-slate-500">
-              <Icon className="h-4 w-4" />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-sm font-medium text-slate-800">{title}</span>
-              <span className="mt-0.5 block text-xs leading-5 text-slate-500">{desc}</span>
-            </span>
-          </Link>
-        ))}
-      </div>
+      {items.length === 0 ? (
+        <div className="px-2 py-8 text-center text-sm text-slate-400">暂无通知</div>
+      ) : (
+        <div className="max-h-96 space-y-1 overflow-y-auto">
+          {items.map((n) => {
+            const Icon = NOTICE_ICON[n.kind] ?? Bell;
+            return (
+              <Link
+                key={n.id}
+                href={n.href}
+                onClick={onNavigate}
+                className="flex gap-3 rounded-md px-2 py-2 hover:bg-slate-50"
+              >
+                <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-md bg-slate-100 text-slate-500">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium text-slate-800">{n.title}</span>
+                  <span className="mt-0.5 block truncate text-xs leading-5 text-slate-500">{n.subtitle}</span>
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

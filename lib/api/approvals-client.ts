@@ -42,3 +42,27 @@ export async function requestApproval(input: ApprovalRequestInput) {
   }
   return data;
 }
+
+/**
+ * 审批 (仅管理员). 「通过」时后端 rpc_review_approval 按类型立即执行对应破坏性操作;
+ * 「驳回」仅记录状态、不执行。
+ */
+export async function reviewApproval(
+  id: string,
+  status: "approved" | "rejected",
+  note?: string,
+) {
+  const sb = getSupabaseBrowser();
+  const { error } = await sb.rpc("rpc_review_approval", {
+    p_id: id,
+    p_status: status,
+    p_reviewer_note: note ?? null,
+  });
+  if (error) {
+    throw new Error(
+      error.message.includes("Could not find the function")
+        ? "审批后端尚未部署：缺少 rpc_review_approval。"
+        : error.message,
+    );
+  }
+}

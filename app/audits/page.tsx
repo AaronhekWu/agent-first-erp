@@ -2,6 +2,7 @@ import { AlertTriangle, CheckCircle2, Clock, XCircle } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { ApprovalActions } from "@/components/audits/approval-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -98,6 +99,11 @@ export default async function AuditsPage() {
                 </div>
                 <div className="text-sm text-slate-500 md:text-right">
                   {formatDate(row.created_at, true)}
+                  {row.status === "pending" && (
+                    <div className="mt-2">
+                      <ApprovalActions id={row.id} />
+                    </div>
+                  )}
                 </div>
               </div>
             );
