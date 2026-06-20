@@ -40,6 +40,7 @@ export async function searchStudents(keyword: string, limit = 10): Promise<Stude
   const { data, error } = await sb
     .from("v_student_overview")
     .select("id, name, student_code, phone, status")
+    .neq("status", "inactive")
     .or(`name.ilike.${kw},phone.ilike.${kw},student_code.ilike.${kw}`)
     .limit(limit);
   if (error) throw new Error(error.message);

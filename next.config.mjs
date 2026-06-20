@@ -6,6 +6,13 @@ const nextConfig = {
   // 关掉构建时遥测, 加速镜像构建
   // (NEXT_TELEMETRY_DISABLED=1 也行, 这里冗余写一遍)
   poweredByHeader: false,
+  experimental: {
+    // 禁用客户端 Router Cache：每次点击侧边栏切页都重新向服务端请求数据，
+    staleTimes: {
+      dynamic: 0,
+      static: 0,
+    },
+  },
 };
 
 export default nextConfig;

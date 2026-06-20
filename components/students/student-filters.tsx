@@ -13,9 +13,9 @@ interface Props {
 }
 
 const STATUS_OPTIONS = [
-  { value: "", label: "全部" },
+  { value: "", label: "在册学员" },
   { value: "active", label: "在读" },
-  { value: "inactive", label: "停课" },
+  { value: "inactive", label: "已停用（历史）" },
   { value: "graduated", label: "已毕业" },
 ];
 

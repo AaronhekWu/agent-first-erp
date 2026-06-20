@@ -61,7 +61,10 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  const allOnPageIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const allOnPageIds = useMemo(
+    () => rows.filter((r) => r.status !== "inactive").map((r) => r.id),
+    [rows],
+  );
   const allSelected = allOnPageIds.length > 0 && allOnPageIds.every((id) => selected.has(id));
   const someSelected = !allSelected && allOnPageIds.some((id) => selected.has(id));
 
@@ -103,6 +106,21 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
     );
 
   const requestStudentDelete = async (student: StudentRow) => {
+    const blockers: string[] = [];
+    if (student.status !== "active") {
+      blockers.push("只有在读学员可以提交删除审批");
+    }
+    if (student.active_enrollment_count > 0) {
+      blockers.push(`仍有 ${student.active_enrollment_count} 门在读课程，请先完成退课或转课`);
+    }
+    if (Number(student.balance) !== 0) {
+      blockers.push(`账户余额为 ${formatCurrency(student.balance)}，请先完成结清`);
+    }
+    if (blockers.length > 0) {
+      alert(`暂不能删除「${student.name}」：\n\n${blockers.map((item) => `• ${item}`).join("\n")}`);
+      return;
+    }
+
     const reason = prompt(`请填写删除学员「${student.name}」的审批原因`);
     if (reason === null) return;
     if (!reason.trim()) return alert("审批原因必填");
@@ -236,6 +254,7 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
             )}
             {rows.map((r) => {
               const isChecked = selected.has(r.id);
+              const isInactive = r.status === "inactive";
               return (
               <tr
                 key={r.id}
@@ -246,17 +265,19 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
                 onClick={() => setActive(r)}
               >
                 <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={() => toggleOne(r.id)}
-                    className="text-slate-400 hover:text-brand-600"
-                    aria-label="选中此行"
-                  >
-                    {isChecked ? (
-                      <CheckSquare className="h-4 w-4 text-brand-600" />
-                    ) : (
-                      <Square className="h-4 w-4" />
-                    )}
-                  </button>
+                  {!isInactive && (
+                    <button
+                      onClick={() => toggleOne(r.id)}
+                      className="text-slate-400 hover:text-brand-600"
+                      aria-label="选中此行"
+                    >
+                      {isChecked ? (
+                        <CheckSquare className="h-4 w-4 text-brand-600" />
+                      ) : (
+                        <Square className="h-4 w-4" />
+                      )}
+                    </button>
+                  )}
                 </td>
                 <td className="px-3 py-3 font-medium text-slate-800">{r.name}</td>
                 <td className="px-3 py-3 text-slate-600">{maskPhone(r.phone)}</td>
@@ -319,22 +340,26 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
                         查看详情
                       </Link>
                     </Gate>
-                    <Gate keys="finance.recharge">
-                      <button
-                        onClick={() => alert("充值功能即将上线")}
-                        className="rounded bg-amber-50 border border-amber-200 px-2 py-1 text-xs text-amber-700 hover:bg-amber-100"
-                      >
-                        充值
-                      </button>
-                    </Gate>
-                    <Gate keys="students.delete">
-                      <button
-                        onClick={() => requestStudentDelete(r)}
-                        className="rounded border border-red-100 bg-red-50 px-2 py-1 text-xs text-red-600 hover:bg-red-100"
-                      >
-                        删除
-                      </button>
-                    </Gate>
+                    {!isInactive && (
+                      <>
+                        <Gate keys="finance.recharge">
+                          <button
+                            onClick={() => alert("充值功能即将上线")}
+                            className="rounded bg-amber-50 border border-amber-200 px-2 py-1 text-xs text-amber-700 hover:bg-amber-100"
+                          >
+                            充值
+                          </button>
+                        </Gate>
+                        <Gate keys="students.delete">
+                          <button
+                            onClick={() => requestStudentDelete(r)}
+                            className="rounded border border-red-100 bg-red-50 px-2 py-1 text-xs text-red-600 hover:bg-red-100"
+                          >
+                            删除
+                          </button>
+                        </Gate>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>

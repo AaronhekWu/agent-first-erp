@@ -34,35 +34,45 @@ export async function requestApproval(input: ApprovalRequestInput) {
     p_payload: input.payload ?? {},
   });
   if (error) {
+    const message = error.message;
     throw new Error(
-      error.message.includes("Could not find the function")
+      message.includes("Could not find the function")
         ? "审批后端尚未部署：缺少 rpc_create_approval_request，未执行原始操作。"
-        : error.message,
+        : message.includes("only active students")
+          ? "该学员已停用，不能重复提交删除审批。"
+          : message.includes("already pending")
+            ? "该对象已有待处理审批，请勿重复提交。"
+            : message.includes(":")
+              ? message.split(":").slice(1).join(":").trim()
+              : message,
     );
   }
   return data;
 }
 
-/**
- * 审批 (仅管理员). 「通过」时后端 rpc_review_approval 按类型立即执行对应破坏性操作;
- * 「驳回」仅记录状态、不执行。
- */
+export interface ReviewApprovalResult {
+  ok: boolean;
+  status: "approved" | "rejected" | "pending";
+  error?: string;
+  execution?: Record<string, unknown>;
+}
+
 export async function reviewApproval(
   id: string,
   status: "approved" | "rejected",
-  note?: string,
+  reviewerNote?: string,
 ) {
   const sb = getSupabaseBrowser();
-  const { error } = await sb.rpc("rpc_review_approval", {
+  const { data, error } = await sb.rpc("rpc_review_approval", {
     p_id: id,
     p_status: status,
-    p_reviewer_note: note ?? null,
+    p_reviewer_note: reviewerNote?.trim() || null,
   });
-  if (error) {
-    throw new Error(
-      error.message.includes("Could not find the function")
-        ? "审批后端尚未部署：缺少 rpc_review_approval。"
-        : error.message,
-    );
+  if (error) throw new Error(error.message);
+
+  const result = data as ReviewApprovalResult;
+  if (!result.ok) {
+    throw new Error(result.error || "审批执行失败，申请仍保持待审批状态");
   }
+  return result;
 }

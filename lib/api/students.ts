@@ -69,6 +69,7 @@ export async function listStudents(
     q = q.or(`name.ilike.${kw},phone.ilike.${kw}`);
   }
   if (filters.status) q = q.eq("status", filters.status);
+  else q = q.neq("status", "inactive");
   if (filters.counselorId) q = q.eq("assigned_to", filters.counselorId);
   if (filters.school) q = q.eq("school", filters.school);
   if (filters.grade) q = q.eq("grade", filters.grade);
