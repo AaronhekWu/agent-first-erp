@@ -41,7 +41,7 @@ export function AttendanceEditModal({ day, onClose, onSaved }: Props) {
 
   const submit = async () => {
     if (isMakeup && !notes.trim()) {
-      setError("INVALID_INPUT: 补课必须填写备注");
+      setError("补课必须填写备注");
       return;
     }
     setSubmitting(true);

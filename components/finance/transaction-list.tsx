@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Download, Eye, Search } from "lucide-react";
+import { Download, Eye, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { Transaction, TxType } from "@/lib/api/finance";
+import { ListPagination } from "@/components/ui/list-pagination";
 
 const TYPE_LABEL: Record<string, { label: string; cls: string }> = {
   recharge: { label: "充值", cls: "text-emerald-600" },
@@ -16,8 +17,6 @@ const TYPE_LABEL: Record<string, { label: string; cls: string }> = {
   adjustment: { label: "调整", cls: "text-slate-600" },
 };
 
-const PAGE_SIZE = 20;
-
 export function TransactionList({ rows }: { rows: Transaction[] }) {
   const [type, setType] = useState<TxType | "">("");
   const [query, setQuery] = useState("");
@@ -26,6 +25,7 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
   const [min, setMin] = useState("");
   const [max, setMax] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
@@ -59,9 +59,9 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
     );
   }, [filtered]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const paged = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const resetPage = (fn: () => void) => {
     fn();
@@ -139,7 +139,7 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-white">
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 text-sm text-slate-500">
+        <div className="border-b border-slate-100 px-4 py-3 text-sm text-slate-500">
           <span>
             当前筛选 <span className="font-medium text-slate-900">{filtered.length}</span> 条
           </span>
@@ -205,17 +205,16 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-4 py-3 text-sm">
-          <button disabled={currentPage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="grid h-8 w-8 place-items-center rounded border border-slate-200 text-slate-500 disabled:opacity-40">
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <span className="text-slate-500">
-            {currentPage} / {totalPages}
-          </span>
-          <button disabled={currentPage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="grid h-8 w-8 place-items-center rounded border border-slate-200 text-slate-500 disabled:opacity-40">
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
+        <ListPagination
+          page={currentPage}
+          pageSize={pageSize}
+          totalItems={filtered.length}
+          onPageChange={setPage}
+          onPageSizeChange={(value) => {
+            setPageSize(value);
+            setPage(1);
+          }}
+        />
       </div>
     </div>
   );

@@ -1,21 +1,32 @@
-import { BookOpen, Users, Wallet, CheckCircle } from "lucide-react";
+import Link from "next/link";
+import { Archive, BookOpen, Users, Wallet, CheckCircle } from "lucide-react";
 import { listCourses } from "@/lib/api/courses";
 import { getLookups } from "@/lib/api/lookups";
 import { NewCourseButton } from "@/components/courses/new-course-button";
-import { CourseCard } from "@/components/courses/course-card";
+import { CourseList } from "@/components/courses/course-list";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { getCourseLifecycle } from "@/lib/course-lifecycle";
 
 export const dynamic = "force-dynamic";
 
-export default async function CoursesPage() {
+interface PageProps {
+  searchParams: { page?: string; pageSize?: string; archived?: string };
+}
+
+export default async function CoursesPage({ searchParams }: PageProps) {
   const [courses, lookups] = await Promise.all([listCourses(), getLookups()]);
+  const page = Math.max(1, Number(searchParams.page ?? "1") || 1);
+  const requestedPageSize = Number(searchParams.pageSize ?? "15");
+  const pageSize = [15, 30, 45, 60, 75, 90].includes(requestedPageSize) ? requestedPageSize : 15;
+  const showArchived = searchParams.archived === "1";
+  const displayCourses = courses.filter((course) => Boolean(course.is_archived) === showArchived);
   const { departments } = lookups;
 
-  const total = courses.length;
-  const activeCount = courses.filter((c) => c.status === "active").length;
-  const enrolled = courses.reduce((s, c) => s + c.active_enrolled, 0);
-  const revenue = courses.reduce((s, c) => s + Number(c.total_revenue ?? 0), 0);
+  const total = displayCourses.length;
+  const activeCount = displayCourses.filter((course) => getCourseLifecycle(course) === "enrolling").length;
+  const enrolled = displayCourses.reduce((s, c) => s + c.active_enrolled, 0);
+  const revenue = displayCourses.reduce((s, c) => s + Number(c.total_revenue ?? 0), 0);
 
   return (
     <div className="space-y-5 p-6">
@@ -26,7 +37,16 @@ export default async function CoursesPage() {
             点击任一课程卡片进入「班级花名册 / 添加学员 / 每日点名」管理面板
           </p>
         </div>
-        <NewCourseButton departments={departments} />
+        <div className="flex items-center gap-2">
+          <Link
+            href={showArchived ? "/courses" : "/courses?archived=1"}
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-600 hover:bg-slate-50"
+          >
+            <Archive className="h-4 w-4" />
+            {showArchived ? "返回课程管理" : "查看归档课程"}
+          </Link>
+          {!showArchived && <NewCourseButton departments={departments} />}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -36,16 +56,12 @@ export default async function CoursesPage() {
         <StatCard label="累计收入" value={formatCurrency(revenue)} Icon={Wallet} bg="bg-violet-50" color="text-violet-600" />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-        {courses.length === 0 && (
-          <div className="col-span-full rounded-2xl bg-white p-12 text-center text-sm text-slate-400 shadow-card">
-            暂无课程，点击右上角「新增课程」创建第一门课
-          </div>
-        )}
-        {courses.map((c) => (
-          <CourseCard key={c.course_id} course={c} />
-        ))}
-      </div>
+      <CourseList
+        courses={displayCourses}
+        page={page}
+        pageSize={pageSize}
+        emptyMessage={showArchived ? "暂无归档课程" : "暂无课程，点击右上角「新增课程」创建第一门课"}
+      />
     </div>
   );
 }

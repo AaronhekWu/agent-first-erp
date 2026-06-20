@@ -6,6 +6,7 @@ import { CheckCircle2, ChevronDown, ChevronUp, Clock, PlayCircle, XCircle } from
 import { reviewApproval } from "@/lib/api/approvals-client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { ListPagination } from "@/components/ui/list-pagination";
 
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 export type ExecutionStatus = "not_started" | "running" | "succeeded" | "failed" | "not_required";
@@ -17,14 +18,13 @@ export interface ApprovalRow {
   reason: string | null;
   target_label: string | null;
   amount: number | null;
-  payload: Record<string, unknown>;
   status: ApprovalStatus;
   requested_by: string | null;
+  requested_by_name?: string | null;
   reviewed_by: string | null;
+  reviewed_by_name?: string | null;
   reviewer_note: string | null;
   execution_status: ExecutionStatus;
-  execution_error: string | null;
-  execution_result: Record<string, unknown> | null;
   created_at: string;
   reviewed_at: string | null;
   executed_at: string | null;
@@ -53,11 +53,16 @@ export function ApprovalList({ rows, canReview }: { rows: ApprovalRow[]; canRevi
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
 
   const filtered = useMemo(
     () => (filter === "all" ? rows : rows.filter((row) => row.status === filter)),
     [filter, rows],
   );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedRows = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const openReview = (row: ApprovalRow, nextDecision: "approved" | "rejected") => {
     setReviewing(row);
@@ -93,7 +98,10 @@ export function ApprovalList({ rows, canReview }: { rows: ApprovalRow[]; canRevi
             <button
               key={value}
               type="button"
-              onClick={() => setFilter(value)}
+              onClick={() => {
+                setFilter(value);
+                setPage(1);
+              }}
               className={cn(
                 "h-8 rounded-md px-3 text-sm",
                 filter === value
@@ -111,7 +119,7 @@ export function ApprovalList({ rows, canReview }: { rows: ApprovalRow[]; canRevi
           {filtered.length === 0 && (
             <div className="px-5 py-12 text-center text-sm text-slate-400">暂无审批记录</div>
           )}
-          {filtered.map((row) => {
+          {pagedRows.map((row) => {
             const meta = STATUS_META[row.status];
             const Icon = meta.Icon;
             const isExpanded = expanded === row.id;
@@ -172,24 +180,35 @@ export function ApprovalList({ rows, canReview }: { rows: ApprovalRow[]; canRevi
 
                 {isExpanded && (
                   <div className="mt-3 grid gap-3 rounded-md bg-slate-50 p-3 text-xs text-slate-600 md:grid-cols-2">
-                    <Detail label="申请人" value={row.requested_by ?? "未知"} />
-                    <Detail label="执行状态" value={EXECUTION_LABEL[row.execution_status]} />
-                    <Detail label="审批时间" value={row.reviewed_at ? formatDate(row.reviewed_at, true) : "—"} />
-                    <Detail label="执行时间" value={row.executed_at ? formatDate(row.executed_at, true) : "—"} />
+                    <Detail label="申请人" value={row.requested_by_name ?? "未知用户"} />
+                    {row.reviewed_by_name && <Detail label="审批人" value={row.reviewed_by_name} />}
+                    {row.reviewed_at && <Detail label="审批时间" value={formatDate(row.reviewed_at, true)} />}
                     {row.reviewer_note && <Detail label="审批意见" value={row.reviewer_note} />}
-                    {row.execution_error && <Detail label="执行错误" value={row.execution_error} danger />}
-                    <div className="md:col-span-2">
-                      <div className="mb-1 text-slate-400">执行参数</div>
-                      <pre className="max-h-44 overflow-auto rounded bg-slate-900 p-3 leading-5 text-slate-100">
-                        {JSON.stringify(row.payload, null, 2)}
-                      </pre>
-                    </div>
+                    {row.status === "approved" && (
+                      <Detail label="业务处理" value={EXECUTION_LABEL[row.execution_status]} />
+                    )}
+                    {row.status === "approved" && row.executed_at && (
+                      <Detail label="处理时间" value={formatDate(row.executed_at, true)} />
+                    )}
+                    {row.execution_status === "failed" && (
+                      <Detail label="处理结果" value="处理未完成，请管理员重试或查看系统日志" danger />
+                    )}
                   </div>
                 )}
               </div>
             );
           })}
         </div>
+        <ListPagination
+          page={currentPage}
+          pageSize={pageSize}
+          totalItems={filtered.length}
+          onPageChange={setPage}
+          onPageSizeChange={(value) => {
+            setPageSize(value);
+            setPage(1);
+          }}
+        />
         {!canReview && (
           <div className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
             当前账号可查看自己提交的审批；通过和驳回操作仅限管理员。

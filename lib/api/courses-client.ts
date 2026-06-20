@@ -34,6 +34,33 @@ export async function listActiveCourseOptions(excludeId?: string): Promise<Activ
   return (data ?? []) as ActiveCourseOption[];
 }
 
+export async function updateCoursePlan(input: {
+  courseId: string;
+  totalLessons: number;
+  startDate: string | null;
+  endDate: string | null;
+}) {
+  const sb = getSupabaseBrowser();
+  const { data, error } = await sb.rpc("rpc_update_course_plan", {
+    p_course_id: input.courseId,
+    p_total_lessons: input.totalLessons,
+    p_start_date: input.startDate,
+    p_end_date: input.endDate,
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function setCompletedCourseArchived(courseId: string, archived: boolean) {
+  const sb = getSupabaseBrowser();
+  const { data, error } = await sb.rpc("rpc_set_completed_course_archived", {
+    p_course_id: courseId,
+    p_archived: archived,
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 export async function searchStudents(keyword: string, limit = 10): Promise<StudentSearchResult[]> {
   const sb = getSupabaseBrowser();
   const kw = `%${keyword}%`;

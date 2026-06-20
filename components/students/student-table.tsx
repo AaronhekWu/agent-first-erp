@@ -51,7 +51,7 @@ const COLS: { key: string; label: string; w?: string; align?: string }[] = [
   { key: "active_enrollment_count", label: "在读课程", w: "w-20", align: "text-center" },
   { key: "last_followup_at", label: "最后跟进", w: "w-36" },
   { key: "created_at", label: "创建时间", w: "w-28" },
-  { key: "action", label: "操作", w: "w-28", align: "text-right" },
+  { key: "action", label: "操作", w: "w-44", align: "text-right" },
 ];
 
 export function StudentTable({ rows, total, page, pageSize }: Props) {
@@ -209,7 +209,7 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1200px] text-sm">
+        <table className="w-full min-w-[1450px] text-sm">
           <thead>
             <tr className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <th className="w-10 px-4 py-3">
@@ -331,7 +331,7 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
                   className="px-3 py-3 text-right"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="flex items-center justify-end gap-1">
+                  <div className="inline-flex items-center gap-1 whitespace-nowrap">
                     <Gate keys="students.view">
                       <Link
                         href={`/students/${r.id}`}
@@ -343,12 +343,12 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
                     {!isInactive && (
                       <>
                         <Gate keys="finance.recharge">
-                          <button
-                            onClick={() => alert("充值功能即将上线")}
+                          <Link
+                            href={`/finance?tab=recharge&student=${r.id}`}
                             className="rounded bg-amber-50 border border-amber-200 px-2 py-1 text-xs text-amber-700 hover:bg-amber-100"
                           >
                             充值
-                          </button>
+                          </Link>
                         </Gate>
                         <Gate keys="students.delete">
                           <button

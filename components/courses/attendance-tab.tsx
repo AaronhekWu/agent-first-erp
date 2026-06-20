@@ -26,10 +26,11 @@ interface Props {
   enrollments: CourseEnrollment[];
   classDate: string;
   setClassDate: (d: string) => void;
+  lessonLimitReached: boolean;
   onMutate: () => Promise<void>;
 }
 
-export function AttendanceTab({ enrollments, classDate, setClassDate, onMutate }: Props) {
+export function AttendanceTab({ enrollments, classDate, setClassDate, lessonLimitReached, onMutate }: Props) {
   const [picks, setPicks] = useState<Map<string, StatusKey>>(new Map());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,6 +100,11 @@ export function AttendanceTab({ enrollments, classDate, setClassDate, onMutate }
 
   return (
     <div className="space-y-4">
+      {lessonLimitReached && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          课程已达到计划总课次，不能新增上课日期。请前往“课程进度”调整计划或申请结课。
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-50 p-4">
         <label className="text-sm text-slate-600">上课日期</label>
         <input
@@ -110,7 +116,7 @@ export function AttendanceTab({ enrollments, classDate, setClassDate, onMutate }
         <button
           type="button"
           onClick={allPresent}
-          disabled={pendingCount === 0}
+          disabled={pendingCount === 0 || lessonLimitReached}
           className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-3 text-sm text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
         >
           <CheckCircle2 className="h-4 w-4" />
@@ -164,7 +170,7 @@ export function AttendanceTab({ enrollments, classDate, setClassDate, onMutate }
                           <button
                             key={o.key}
                             type="button"
-                            disabled={isMarked}
+                            disabled={isMarked || lessonLimitReached}
                             onClick={() => setOne(e.enrollment_id, o.key)}
                             className={cn(
                               "inline-flex h-7 items-center gap-1 rounded border px-2 text-xs transition",
@@ -197,7 +203,7 @@ export function AttendanceTab({ enrollments, classDate, setClassDate, onMutate }
         </div>
         <button
           onClick={submit}
-          disabled={submitting || pendingCount === 0}
+          disabled={submitting || pendingCount === 0 || lessonLimitReached}
           className="inline-flex h-9 items-center gap-1.5 rounded-md bg-brand-600 px-5 text-sm font-medium text-white hover:bg-brand-700 disabled:bg-slate-300"
         >
           {submitting ? "保存中…" : "保存点名"}

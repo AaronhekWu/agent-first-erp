@@ -60,7 +60,7 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
 
   const submit = async () => {
     if (!name.trim() || !subject.trim() || !level.trim()) {
-      setError("INVALID_INPUT: 课程名 / 学科 / 年级 必填");
+      setError("课程名 / 学科 / 年级 必填");
       return;
     }
     setSubmitting(true);

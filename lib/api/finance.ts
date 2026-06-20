@@ -1,4 +1,5 @@
 import { createServerSupabase } from "@/lib/supabase/server";
+import type { StudentSearchResult } from "./courses";
 
 // ---------- 类型 ----------
 
@@ -100,6 +101,19 @@ export async function listTransactions(opts: {
     student_name: r.fin_accounts?.stu_students?.name,
     student_code: r.fin_accounts?.stu_students?.student_code ?? null,
   }));
+}
+
+export async function getRechargeStudent(studentId?: string): Promise<StudentSearchResult | null> {
+  if (!studentId) return null;
+  const sb = createServerSupabase();
+  const { data, error } = await sb
+    .from("v_student_overview")
+    .select("id, name, student_code, phone, status")
+    .eq("id", studentId)
+    .eq("status", "active")
+    .maybeSingle();
+  if (error) throw error;
+  return (data as StudentSearchResult | null) ?? null;
 }
 
 function monthStartIso(): string {

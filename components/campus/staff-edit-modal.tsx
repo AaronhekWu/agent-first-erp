@@ -63,11 +63,11 @@ export function StaffEditModal({ open, onClose, editing, departments }: Props) {
 
   const submit = async () => {
     if (!displayName.trim()) {
-      setError("INVALID_INPUT: 姓名必填");
+      setError("姓名必填");
       return;
     }
     if (!isValidPhone(phone)) {
-      setError("INVALID_INPUT: 手机号必须为 6-15 位数字");
+      setError("手机号必须为 6-15 位数字");
       return;
     }
     setSubmitting(true);

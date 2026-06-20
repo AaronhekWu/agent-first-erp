@@ -13,7 +13,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [15, 30, 45, 60, 75, 90];
 
 interface PageProps {
   searchParams: {
@@ -26,11 +26,14 @@ interface PageProps {
     from?: string;
     to?: string;
     page?: string;
+    pageSize?: string;
   };
 }
 
 export default async function StudentsPage({ searchParams }: PageProps) {
   const page = Math.max(1, Number(searchParams.page ?? "1") || 1);
+  const requestedPageSize = Number(searchParams.pageSize ?? "15");
+  const pageSize = PAGE_SIZE_OPTIONS.includes(requestedPageSize) ? requestedPageSize : 15;
 
   const filters: F = {
     keyword: searchParams.q,
@@ -45,7 +48,7 @@ export default async function StudentsPage({ searchParams }: PageProps) {
 
   const [kpis, list, lookups] = await Promise.all([
     getStudentKpis(),
-    listStudents(filters, page, PAGE_SIZE),
+    listStudents(filters, page, pageSize),
     getLookups(),
   ]);
   const { counselors, departments, schools, grades } = lookups;
@@ -77,7 +80,7 @@ export default async function StudentsPage({ searchParams }: PageProps) {
         rows={list.rows}
         total={list.total}
         page={page}
-        pageSize={PAGE_SIZE}
+        pageSize={pageSize}
       />
     </div>
   );

@@ -1,5 +1,5 @@
 import { Wallet, Undo2, Minus, ListOrdered } from "lucide-react";
-import { getFinanceKpis, listTransactions } from "@/lib/api/finance";
+import { getFinanceKpis, getRechargeStudent, listTransactions } from "@/lib/api/finance";
 import { Tabs } from "@/components/settings/tabs";
 import { RechargeForm } from "@/components/finance/recharge-form";
 import { RefundForm } from "@/components/finance/refund-form";
@@ -10,10 +10,20 @@ import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export default async function FinancePage() {
-  const [kpis, txs] = await Promise.all([
+interface PageProps {
+  searchParams: { tab?: string; student?: string };
+}
+
+const FINANCE_TABS = ["recharge", "refund", "consume", "transactions"] as const;
+
+export default async function FinancePage({ searchParams }: PageProps) {
+  const activeTab = FINANCE_TABS.includes(searchParams.tab as (typeof FINANCE_TABS)[number])
+    ? searchParams.tab
+    : "recharge";
+  const [kpis, txs, rechargeStudent] = await Promise.all([
     getFinanceKpis(),
     listTransactions({ limit: 100 }),
+    getRechargeStudent(searchParams.student),
   ]);
 
   return (
@@ -21,7 +31,7 @@ export default async function FinancePage() {
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">财务管理</h1>
         <p className="mt-1 text-sm text-slate-500">
-          学员充值、退费、手动消课、流水审计 —— 全部走 SECURITY DEFINER RPC，自动生成审计与交易流水
+          学员充值、退费、手动消课、流水审计
         </p>
       </div>
 
@@ -33,8 +43,10 @@ export default async function FinancePage() {
       </div>
 
       <Tabs
+        defaultActiveKey={activeTab}
+        queryParam="tab"
         tabs={[
-          { key: "recharge", label: "充值", content: <RechargeForm /> },
+          { key: "recharge", label: "充值", content: <RechargeForm initialStudent={rechargeStudent} /> },
           { key: "refund", label: "退费", content: <RefundForm /> },
           { key: "consume", label: "手动消课", content: <ConsumeForm /> },
           { key: "transactions", label: "全部流水", content: <TransactionList rows={txs} /> },

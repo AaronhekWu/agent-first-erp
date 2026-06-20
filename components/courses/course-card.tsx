@@ -1,28 +1,39 @@
 "use client";
 
 import { useState } from "react";
-import { Archive, BookOpen, Calendar, Trash2, Users } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Archive, ArchiveRestore, BookOpen, Calendar, CheckCircle2, Trash2, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { requestApproval } from "@/lib/api/approvals-client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { CourseManageModal } from "./course-manage-modal";
 import type { CourseRow } from "@/lib/api/courses";
+import { getCourseLifecycle, lessonProgress, type CourseLifecycle } from "@/lib/course-lifecycle";
+import { setCompletedCourseArchived } from "@/lib/api/courses-client";
 
-const STATUS: Record<string, { label: string; cls: string; ring: string }> = {
-  active: { label: "招生中", cls: "bg-emerald-50 text-emerald-700", ring: "ring-emerald-200" },
-  inactive: { label: "暂停", cls: "bg-slate-100 text-slate-600", ring: "ring-slate-200" },
-  archived: { label: "已归档", cls: "bg-blue-50 text-blue-700", ring: "ring-blue-200" },
+const STATUS: Record<CourseLifecycle, { label: string; cls: string; ring: string }> = {
+  enrolling: { label: "招生中", cls: "bg-emerald-50 text-emerald-700", ring: "ring-emerald-200" },
+  full: { label: "已满班", cls: "bg-red-50 text-red-700", ring: "ring-red-200" },
+  ready_to_complete: { label: "待结课", cls: "bg-amber-50 text-amber-700", ring: "ring-amber-200" },
+  paused: { label: "已暂停", cls: "bg-slate-100 text-slate-600", ring: "ring-slate-200" },
+  completed: { label: "已结课", cls: "bg-blue-50 text-blue-700", ring: "ring-blue-200" },
 };
 
 export function CourseCard({ course }: { course: CourseRow }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState<"archive" | "delete" | null>(null);
+  const [busy, setBusy] = useState<"archive" | "delete" | "visibility" | null>(null);
   const cap = course.max_capacity ?? 0;
   const filled = course.active_enrolled ?? 0;
   const capPct = cap > 0 ? Math.min(100, Math.round((filled / cap) * 100)) : 0;
-  const st = STATUS[course.status] ?? STATUS.active;
+  const lifecycle = getCourseLifecycle(course);
+  const st = STATUS[lifecycle];
+  const progress = lessonProgress(course);
+  const displayStatus = course.is_archived
+    ? { label: "已归档", cls: "bg-slate-100 text-slate-600", ring: "ring-slate-200" }
+    : st;
   const submitCourseApproval = async (type: "archive" | "delete") => {
-    const label = type === "archive" ? "归档" : "删除";
+    const label = type === "archive" ? "结课" : "删除";
     const reason = prompt(`请填写${label}课程「${course.course_name}」的审批原因`);
     if (reason === null) return;
     if (!reason.trim()) return alert("审批原因必填");
@@ -39,6 +50,18 @@ export function CourseCard({ course }: { course: CourseRow }) {
       alert(`已提交${label}课程审批`);
     } catch (e) {
       alert((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const toggleArchived = async () => {
+    setBusy("visibility");
+    try {
+      await setCompletedCourseArchived(course.course_id, !course.is_archived);
+      router.refresh();
+    } catch (error) {
+      alert((error as Error).message);
     } finally {
       setBusy(null);
     }
@@ -64,8 +87,8 @@ export function CourseCard({ course }: { course: CourseRow }) {
                 )}
               </div>
             </div>
-            <span className={cn("rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset", st.cls, st.ring)}>
-              {st.label}
+            <span className={cn("rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset", displayStatus.cls, displayStatus.ring)}>
+              {displayStatus.label}
             </span>
           </div>
 
@@ -91,7 +114,8 @@ export function CourseCard({ course }: { course: CourseRow }) {
           <div className="flex items-center justify-between text-xs text-slate-500">
           <span className="inline-flex items-center gap-1">
             <Calendar className="h-3.5 w-3.5" />
-            {course.start_date ? formatDate(course.start_date) : "—"}
+            {course.start_date ? formatDate(course.start_date) : "未设置"}
+            {course.end_date && ` 至 ${formatDate(course.end_date)}`}
           </span>
           <span className="font-semibold text-amber-600">{formatCurrency(course.fee)}</span>
           </div>
@@ -102,8 +126,10 @@ export function CourseCard({ course }: { course: CourseRow }) {
             <div className="text-[11px] text-slate-500">在读</div>
           </div>
           <div>
-            <div className="font-semibold text-slate-800">{course.attendance_rate}%</div>
-            <div className="text-[11px] text-slate-500">出勤率</div>
+            <div className="font-semibold text-slate-800">
+              {progress.total == null ? `${progress.completed} 节` : `${progress.completed}/${progress.total}`}
+            </div>
+            <div className="text-[11px] text-slate-500">课程进度</div>
           </div>
           <div>
             <div className="font-semibold text-slate-800">{formatCurrency(course.total_revenue).replace("¥ ", "¥")}</div>
@@ -112,24 +138,38 @@ export function CourseCard({ course }: { course: CourseRow }) {
           </div>
         </button>
         <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
-          <button
-            type="button"
-            disabled={busy !== null || course.status === "archived"}
-            onClick={() => submitCourseApproval("archive")}
-            className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 px-2.5 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-40"
-          >
-            <Archive className="h-3.5 w-3.5" />
-            {busy === "archive" ? "提交中" : "归档"}
-          </button>
-          <button
-            type="button"
-            disabled={busy !== null}
-            onClick={() => submitCourseApproval("delete")}
-            className="inline-flex h-8 items-center gap-1 rounded-md border border-red-100 bg-red-50 px-2.5 text-xs text-red-600 hover:bg-red-100 disabled:opacity-40"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            {busy === "delete" ? "提交中" : "删除"}
-          </button>
+          {lifecycle === "completed" ? (
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={toggleArchived}
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 px-2.5 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+            >
+              {course.is_archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+              {busy === "visibility" ? "处理中" : course.is_archived ? "取消归档" : "归档"}
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => submitCourseApproval("archive")}
+                className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 px-2.5 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {busy === "archive" ? "提交中" : "结课"}
+              </button>
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => submitCourseApproval("delete")}
+                className="inline-flex h-8 items-center gap-1 rounded-md border border-red-100 bg-red-50 px-2.5 text-xs text-red-600 hover:bg-red-100 disabled:opacity-40"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {busy === "delete" ? "提交中" : "删除"}
+              </button>
+            </>
+          )}
         </div>
       </div>
       <CourseManageModal open={open} onClose={() => setOpen(false)} course={course} />

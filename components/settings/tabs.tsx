@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 interface Tab {
@@ -9,9 +10,37 @@ interface Tab {
   content: React.ReactNode;
 }
 
-export function Tabs({ tabs }: { tabs: Tab[] }) {
-  const [active, setActive] = useState(tabs[0]?.key);
+export function Tabs({
+  tabs,
+  defaultActiveKey,
+  queryParam,
+}: {
+  tabs: Tab[];
+  defaultActiveKey?: string;
+  queryParam?: string;
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const initialKey = tabs.some((tab) => tab.key === defaultActiveKey)
+    ? defaultActiveKey
+    : tabs[0]?.key;
+  const [active, setActive] = useState(initialKey);
   const cur = tabs.find((t) => t.key === active) ?? tabs[0];
+
+  useEffect(() => {
+    if (defaultActiveKey && tabs.some((tab) => tab.key === defaultActiveKey)) {
+      setActive(defaultActiveKey);
+    }
+  }, [defaultActiveKey]);
+
+  const selectTab = (key: string) => {
+    setActive(key);
+    if (!queryParam) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set(queryParam, key);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
 
   return (
     <div className="rounded-2xl bg-white shadow-card">
@@ -19,7 +48,7 @@ export function Tabs({ tabs }: { tabs: Tab[] }) {
         {tabs.map((t) => (
           <button
             key={t.key}
-            onClick={() => setActive(t.key)}
+            onClick={() => selectTab(t.key)}
             className={cn(
               "relative px-4 py-3 text-sm transition-colors",
               t.key === active

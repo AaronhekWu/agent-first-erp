@@ -31,7 +31,7 @@ export function ProfileForm({ current }: Props) {
 
   const submit = async () => {
     if (!isValidPhone(phone)) {
-      setError("INVALID_INPUT: 手机号必须为 6-15 位数字");
+      setError("手机号必须为 6-15 位数字");
       return;
     }
     if (!current) {

@@ -37,7 +37,7 @@ export function DepartmentEditModal({ open, onClose, editing, departments, staff
 
   const submit = async () => {
     if (!name.trim()) {
-      setError("INVALID_INPUT: 部门名称必填");
+      setError("部门名称必填");
       return;
     }
     setSubmitting(true);

@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, Users, UserPlus, LogOut, CalendarCheck } from "lucide-react";
+import { X, Users, UserPlus, LogOut, CalendarCheck, Gauge } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { listCourseEnrollments } from "@/lib/api/courses-client";
 import type { CourseEnrollment, CourseRow } from "@/lib/api/courses";
 import { RosterTab } from "./roster-tab";
 import { EnrollTab } from "./enroll-tab";
 import { AttendanceTab } from "./attendance-tab";
+import { CoursePlanTab } from "./course-plan-tab";
+import { getCourseLifecycle } from "@/lib/course-lifecycle";
 
 interface Props {
   open: boolean;
@@ -17,6 +19,7 @@ interface Props {
 }
 
 const TABS = [
+  { key: "plan", label: "课程进度", Icon: Gauge },
   { key: "roster", label: "班级花名册", Icon: Users },
   { key: "enroll", label: "添加学员", Icon: UserPlus },
   { key: "attendance", label: "每日点名", Icon: CalendarCheck },
@@ -26,7 +29,7 @@ type TabKey = (typeof TABS)[number]["key"];
 
 export function CourseManageModal({ open, onClose, course }: Props) {
   const router = useRouter();
-  const [tab, setTab] = useState<TabKey>("roster");
+  const [tab, setTab] = useState<TabKey>("plan");
   const [classDate, setClassDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [enrollments, setEnrollments] = useState<CourseEnrollment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -56,6 +59,8 @@ export function CourseManageModal({ open, onClose, course }: Props) {
   };
 
   if (!open) return null;
+  const lifecycle = getCourseLifecycle(course);
+  const enrollmentClosed = lifecycle === "full" || lifecycle === "ready_to_complete" || lifecycle === "completed";
 
   return (
     <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-slate-900/40 p-6">
@@ -83,10 +88,13 @@ export function CourseManageModal({ open, onClose, course }: Props) {
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
+              disabled={(t.key === "enroll" && enrollmentClosed) || (t.key === "attendance" && lifecycle === "completed")}
               className={cn(
                 "relative inline-flex items-center gap-1.5 px-4 py-3 text-sm transition-colors",
                 tab === t.key ? "text-brand-600 font-medium" : "text-slate-500 hover:text-slate-700",
+                "disabled:cursor-not-allowed disabled:text-slate-300",
               )}
+              title={t.key === "enroll" && enrollmentClosed ? "当前课程已停止招生" : undefined}
             >
               <t.Icon className="h-4 w-4" />
               {t.label}
@@ -107,6 +115,7 @@ export function CourseManageModal({ open, onClose, course }: Props) {
           )}
           {!loading && !error && (
             <>
+              {tab === "plan" && <CoursePlanTab course={course} onMutate={handleMutation} />}
               {tab === "roster" && (
                 <RosterTab
                   enrollments={enrollments}
@@ -126,6 +135,11 @@ export function CourseManageModal({ open, onClose, course }: Props) {
                   enrollments={enrollments.filter((e) => e.status === "enrolled")}
                   classDate={classDate}
                   setClassDate={setClassDate}
+                  lessonLimitReached={Boolean(
+                    course.total_lessons
+                    && course.completed_sessions >= course.total_lessons
+                    && !enrollments.some((enrollment) => enrollment.today_attendance_id)
+                  )}
                   onMutate={handleMutation}
                 />
               )}

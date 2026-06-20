@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export default async function AuditsPage() {
-  const [{ rows, unavailable, message }, me] = await Promise.all([listApprovals(), getMe()]);
+  const [{ rows, unavailable }, me] = await Promise.all([listApprovals(), getMe()]);
   const pending = rows.filter((r) => r.status === "pending").length;
   const approved = rows.filter((r) => r.status === "approved").length;
   const rejected = rows.filter((r) => r.status === "rejected").length;
@@ -25,10 +25,8 @@ export default async function AuditsPage() {
         <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
-            <div className="font-medium">审批后端尚未部署</div>
-            <div className="mt-1 text-amber-700">
-              {message} 当前页面已接好 `aud_approvals` 读取口径，破坏性操作会尝试提交审批，不会直接执行原 RPC。
-            </div>
+            <div className="font-medium">审批服务暂时不可用</div>
+            <div className="mt-1 text-amber-700">请稍后刷新页面；高风险操作不会在审批服务恢复前执行。</div>
           </div>
         </div>
       )}
@@ -48,13 +46,34 @@ async function listApprovals(): Promise<{ rows: ApprovalRow[]; unavailable: bool
   const sb = createServerSupabase();
   const { data, error } = await sb
     .from("aud_approvals")
-    .select("id, type, title, reason, target_label, amount, payload, status, requested_by, reviewed_by, reviewer_note, execution_status, execution_error, execution_result, created_at, reviewed_at, executed_at")
+    .select("id, type, title, reason, target_label, amount, status, requested_by, reviewed_by, reviewer_note, execution_status, created_at, reviewed_at, executed_at")
     .order("created_at", { ascending: false })
     .limit(100);
   if (error) {
+    console.error("Failed to load approvals", error);
     return { rows: [], unavailable: true, message: error.message };
   }
-  return { rows: (data ?? []) as ApprovalRow[], unavailable: false, message: "" };
+  const rows = (data ?? []) as ApprovalRow[];
+  const userIds = [...new Set(rows.flatMap((row) => [row.requested_by, row.reviewed_by]).filter((id): id is string => Boolean(id)))];
+  const names = new Map<string, string>();
+  if (userIds.length > 0) {
+    const { data: profiles, error: profileError } = await sb
+      .from("acct_profiles")
+      .select("id, display_name")
+      .in("id", userIds);
+    if (profileError) console.error("Failed to load approval user names", profileError);
+    for (const profile of profiles ?? []) names.set(profile.id, profile.display_name);
+  }
+
+  return {
+    rows: rows.map((row) => ({
+      ...row,
+      requested_by_name: row.requested_by ? names.get(row.requested_by) ?? null : null,
+      reviewed_by_name: row.reviewed_by ? names.get(row.reviewed_by) ?? null : null,
+    })),
+    unavailable: false,
+    message: "",
+  };
 }
 
 function Kpi({ label, value, tone }: { label: string; value: number; tone: "amber" | "emerald" | "red" }) {

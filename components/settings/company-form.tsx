@@ -23,7 +23,7 @@ export function CompanyForm({ company }: { company: Company | null }) {
 
   const submit = async () => {
     if (!isValidPhone(contactPhone)) {
-      setError("INVALID_INPUT: 联系电话必须为 6-15 位数字");
+      setError("联系电话必须为 6-15 位数字");
       return;
     }
     setSubmitting(true);

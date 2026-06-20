@@ -20,7 +20,6 @@ export function StudentSignalsCard({ signals }: { signals: StudentSignals }) {
       <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
         <AlertTriangle className="h-4 w-4 text-amber-500" />
         学员风险信号
-        <span className="ml-auto text-[11px] text-slate-400">AI 输入: rpc_get_student_signals</span>
       </div>
 
       <div className="grid grid-cols-3 gap-3 text-sm">

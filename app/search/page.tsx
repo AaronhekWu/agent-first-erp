@@ -2,17 +2,21 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import { listStudents, type StudentFilters } from "@/lib/api/students";
 import { maskPhone, formatCurrency } from "@/lib/format";
+import { UrlListPagination } from "@/components/ui/url-list-pagination";
 
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  searchParams: { q?: string };
+  searchParams: { q?: string; page?: string; pageSize?: string };
 }
 
 export default async function SearchPage({ searchParams }: PageProps) {
   const q = (searchParams.q ?? "").trim();
+  const page = Math.max(1, Number(searchParams.page ?? "1") || 1);
+  const requestedPageSize = Number(searchParams.pageSize ?? "15");
+  const pageSize = [15, 30, 45, 60, 75, 90].includes(requestedPageSize) ? requestedPageSize : 15;
   const filters: StudentFilters = { keyword: q };
-  const result = q ? await listStudents(filters, 1, 30) : { rows: [], total: 0 };
+  const result = q ? await listStudents(filters, page, pageSize) : { rows: [], total: 0 };
 
   return (
     <div className="space-y-5 p-6">
@@ -22,7 +26,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
           全局搜索
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          当前已接入学员搜索，课程、财务与审批搜索将在对应数据源稳定后合并。
+          搜索学员姓名、手机号或学员编号。
         </p>
       </div>
 
@@ -67,6 +71,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
             </Link>
           ))}
         </div>
+        {q && <UrlListPagination page={page} pageSize={pageSize} totalItems={result.total} />}
       </div>
     </div>
   );

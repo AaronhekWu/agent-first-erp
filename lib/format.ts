@@ -60,11 +60,11 @@ export function followupTypeLabel(t: string | null | undefined): string {
 export function studentStatusLabel(s: string | null | undefined): string {
   switch (s) {
     case "active":
-      return "active";
+      return "在读";
     case "inactive":
-      return "inactive";
+      return "已停用";
     case "graduated":
-      return "graduated";
+      return "已毕业";
     default:
       return s ?? "—";
   }

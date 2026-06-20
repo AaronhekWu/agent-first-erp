@@ -52,15 +52,15 @@ export function NewStudentModal({ open, onClose, counselors, departments }: Prop
 
   const submit = async () => {
     if (!name.trim()) {
-      setError("INVALID_INPUT: 姓名必填");
+      setError("姓名必填");
       return;
     }
     if (!isValidPhone(phone)) {
-      setError("INVALID_INPUT: 学员手机号必须为 6-15 位数字");
+      setError("学员手机号必须为 6-15 位数字");
       return;
     }
     if (!isValidPhone(parentPhone)) {
-      setError("INVALID_INPUT: 家长手机号必须为 6-15 位数字");
+      setError("家长手机号必须为 6-15 位数字");
       return;
     }
     setSubmitting(true);

@@ -8,6 +8,7 @@ import { requestApproval } from "@/lib/api/approvals-client";
 import { maskPhone } from "@/lib/format";
 import { StaffEditModal } from "./staff-edit-modal";
 import type { DepartmentDetail, StaffRow } from "@/lib/api/campus";
+import { ListPagination } from "@/components/ui/list-pagination";
 
 const ROLE_LABEL: Record<string, string> = {
   admin: "系统管理员",
@@ -33,6 +34,8 @@ export function StaffTable({ staff, departments }: Props) {
   const [editing, setEditing] = useState<StaffRow | "new" | null>(null);
   const [filter, setFilter] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
 
   const filtered = staff.filter((s) => {
     if (!s.is_active) return false;
@@ -45,6 +48,9 @@ export function StaffTable({ staff, departments }: Props) {
       (s.email ?? "").toLowerCase().includes(kw)
     );
   });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedStaff = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handleDelete = async (s: StaffRow) => {
     const reason = prompt(`请填写停用「${s.display_name}」的审批原因`);
@@ -71,13 +77,19 @@ export function StaffTable({ staff, departments }: Props) {
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <input
           value={filter}
-          onChange={(e) => setFilter(e.target.value)}
+          onChange={(e) => {
+            setFilter(e.target.value);
+            setPage(1);
+          }}
           placeholder="按姓名 / 手机 / 邮箱搜索"
           className="h-9 w-64 rounded-md border border-slate-200 bg-white px-3 text-sm focus:border-brand-500 focus:outline-none"
         />
         <select
           value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
+          onChange={(e) => {
+            setRoleFilter(e.target.value);
+            setPage(1);
+          }}
           className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm focus:border-brand-500 focus:outline-none"
         >
           <option value="">全部角色</option>
@@ -109,7 +121,7 @@ export function StaffTable({ staff, departments }: Props) {
               <th className="px-3 py-3 text-left">手机号</th>
               <th className="px-3 py-3 text-left">邮箱</th>
               <th className="px-3 py-3 text-center">权限数</th>
-              <th className="px-3 py-3 text-right">操作</th>
+              <th className="px-3 py-3 text-center">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -120,7 +132,7 @@ export function StaffTable({ staff, departments }: Props) {
                 </td>
               </tr>
             )}
-            {filtered.map((s) => {
+            {pagedStaff.map((s) => {
               const role = s.primary_role ?? "";
               const cls = ROLE_CLS[role] ?? "bg-slate-100 text-slate-600 ring-slate-200";
               return (
@@ -174,6 +186,16 @@ export function StaffTable({ staff, departments }: Props) {
             })}
           </tbody>
         </table>
+        <ListPagination
+          page={currentPage}
+          pageSize={pageSize}
+          totalItems={filtered.length}
+          onPageChange={setPage}
+          onPageSizeChange={(value) => {
+            setPageSize(value);
+            setPage(1);
+          }}
+        />
       </div>
 
       <StaffEditModal

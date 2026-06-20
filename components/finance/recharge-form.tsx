@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Wallet } from "lucide-react";
 import { Field, inputCls, textareaCls } from "@/components/ui/form";
 import { StudentPicker } from "./student-picker";
@@ -17,9 +17,11 @@ const PAY_METHODS = [
   { value: "other", label: "其他" },
 ];
 
-export function RechargeForm() {
+export function RechargeForm({ initialStudent = null }: { initialStudent?: StudentSearchResult | null }) {
   const router = useRouter();
-  const [student, setStudent] = useState<StudentSearchResult | null>(null);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [student, setStudent] = useState<StudentSearchResult | null>(initialStudent);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("wechat");
   const [bonus, setBonus] = useState("0");
@@ -28,6 +30,18 @@ export function RechargeForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+
+  useEffect(() => {
+    setStudent(initialStudent);
+  }, [initialStudent]);
+
+  const clearStudentContext = () => {
+    setStudent(null);
+    if (!searchParams.has("student")) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("student");
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
 
   const submit = async () => {
     if (!student) return setError("请选择学员");
@@ -46,7 +60,7 @@ export function RechargeForm() {
         p_notes: notes.trim() || null,
       });
       setInfo(`已为 ${student.name} 充值 ${formatCurrency(n)}`);
-      setStudent(null);
+      clearStudentContext();
       setAmount("");
       setBonus("0");
       setRef("");
@@ -66,7 +80,13 @@ export function RechargeForm() {
         学员账户充值
       </div>
       <Field label="学员" required>
-        <StudentPicker value={student} onChange={setStudent} />
+        <StudentPicker
+          value={student}
+          onChange={(next) => {
+            if (next) setStudent(next);
+            else clearStudentContext();
+          }}
+        />
       </Field>
       <div className="grid grid-cols-2 gap-4">
         <Field label="充值金额 (¥)" required>

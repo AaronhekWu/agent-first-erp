@@ -18,6 +18,9 @@ export interface CourseRow {
   total_attendance: number;
   present_count: number;
   attendance_rate: number;
+  completed_sessions: number;
+  total_lessons: number | null;
+  is_archived: boolean;
   total_revenue: number;
   start_date: string | null;
   end_date: string | null;

@@ -13,10 +13,10 @@ interface Props {
   overview: FollowupOverview;
 }
 
-const RISK_CLS: Record<string, string> = {
-  critical: "bg-red-50 text-red-700 ring-red-200",
-  warning: "bg-amber-50 text-amber-700 ring-amber-200",
-  ok: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+const RISK_META: Record<string, { label: string; cls: string }> = {
+  critical: { label: "高风险", cls: "bg-red-50 text-red-700 ring-red-200" },
+  warning: { label: "需关注", cls: "bg-amber-50 text-amber-700 ring-amber-200" },
+  ok: { label: "正常", cls: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
 };
 
 export function FollowupsShell({ overview }: Props) {
@@ -106,15 +106,15 @@ export function FollowupsShell({ overview }: Props) {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="truncate text-sm font-medium text-slate-800">{s.student_name}</span>
-                    {s.risk_level && s.risk_level !== "ok" && (
+                    {s.risk_level && s.risk_level !== "ok" && RISK_META[s.risk_level] && (
                       <span
                         className={cn(
                           "inline-flex items-center gap-0.5 rounded-md px-1 py-0.5 text-[10px] ring-1 ring-inset",
-                          RISK_CLS[s.risk_level],
+                          RISK_META[s.risk_level].cls,
                         )}
                       >
                         <AlertTriangle className="h-2.5 w-2.5" />
-                        {s.risk_level}
+                        {RISK_META[s.risk_level].label}
                       </span>
                     )}
                   </div>
