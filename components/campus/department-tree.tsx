@@ -223,7 +223,7 @@ function TreeRow({
           {node.name}
         </button>
         {node.manager && (
-          <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700">
+          <span className="inline-flex shrink-0 items-center whitespace-nowrap gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700">
             <Crown className="h-3 w-3" /> 主管: {node.manager.display_name}
           </span>
         )}

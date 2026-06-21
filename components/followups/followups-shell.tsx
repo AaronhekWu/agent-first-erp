@@ -109,7 +109,7 @@ export function FollowupsShell({ overview }: Props) {
                     {s.risk_level && s.risk_level !== "ok" && RISK_META[s.risk_level] && (
                       <span
                         className={cn(
-                          "inline-flex items-center gap-0.5 rounded-md px-1 py-0.5 text-[10px] ring-1 ring-inset",
+                          "inline-flex shrink-0 items-center whitespace-nowrap gap-0.5 rounded-md px-1 py-0.5 text-[10px] ring-1 ring-inset",
                           RISK_META[s.risk_level].cls,
                         )}
                       >

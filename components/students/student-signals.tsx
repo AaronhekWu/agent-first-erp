@@ -55,7 +55,7 @@ export function StudentSignalsCard({ signals }: { signals: StudentSignals }) {
               <span
                 key={k}
                 className={cn(
-                  "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs ring-1 ring-inset",
+                  "inline-flex shrink-0 items-center whitespace-nowrap gap-1 rounded-md px-2 py-0.5 text-xs ring-1 ring-inset",
                   v.cls,
                 )}
               >

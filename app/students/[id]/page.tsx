@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Wallet, BookOpen, Phone, Calendar, User, FileText } from "lucide-react";
+import { ArrowLeft, Wallet, BookOpen, Phone, Calendar, User, FileText, GraduationCap } from "lucide-react";
 import { getStudentDetail } from "@/lib/api/student-detail";
 import { getStudentSignals } from "@/lib/api/signals";
 import { StatusBadge } from "@/components/students/status-badge";
@@ -98,8 +98,16 @@ export default async function StudentDetailPage({ params }: Props) {
             <InfoLine icon={User} label="顾问" value={s.counselor_name ?? "—"} />
             <InfoLine icon={User} label="部门" value={s.department_name ?? "—"} />
             <InfoLine icon={FileText} label="来源" value={s.source ?? "—"} />
+            {s.status === "graduated" && (
+              <InfoLine icon={GraduationCap} label="毕业日期" value={s.graduated_at ? formatDate(s.graduated_at) : "—"} />
+            )}
           </div>
 
+          {s.status === "graduated" && s.graduation_note && (
+            <div className="mt-4 rounded-md bg-blue-50 p-3 text-sm text-blue-700">
+              <span className="font-medium">毕业备注：</span>{s.graduation_note}
+            </div>
+          )}
           {s.notes && (
             <div className="mt-4 rounded-md bg-slate-50 p-3 text-sm text-slate-600">
               <span className="font-medium text-slate-700">备注：</span>

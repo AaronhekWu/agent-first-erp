@@ -231,8 +231,8 @@ declare
 begin
   if not public.has_permission('courses.enroll') then raise exception 'PERMISSION_DENIED: 无权办理报名'; end if;
   if p_source not in ('normal','campaign','referral','custom') then raise exception '报名类型无效'; end if;
-  if not exists (select 1 from public.stu_students where id=p_student_id and deleted_at is null and status <> 'inactive') then
-    raise exception '学员不存在或已停用';
+  if not exists (select 1 from public.stu_students where id=p_student_id and deleted_at is null and status = 'active') then
+    raise exception '学员不存在或当前不是在读状态';
   end if;
   select * into v_course from public.crs_courses where id=p_course_id and deleted_at is null for update;
   if not found or v_course.status <> 'active' then raise exception '课程不存在或当前不可报名'; end if;

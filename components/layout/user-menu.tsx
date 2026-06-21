@@ -58,7 +58,7 @@ export function UserMenu() {
             {user.email && (
               <div className="mt-0.5 text-xs text-slate-500">{user.email}</div>
             )}
-            <div className="mt-1 inline-flex rounded bg-brand-50 px-1.5 py-0.5 text-[11px] text-brand-700">
+            <div className="mt-1 inline-flex shrink-0 whitespace-nowrap rounded bg-brand-50 px-1.5 py-0.5 text-[11px] text-brand-700">
               {roleLabel}
             </div>
           </div>

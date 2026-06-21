@@ -12,6 +12,10 @@ export interface StudentDetail {
     school?: string | null;
     grade?: string | null;
     status: string;
+    graduated_at?: string | null;
+    graduation_note?: string | null;
+    reactivated_at?: string | null;
+    reactivation_note?: string | null;
     source?: string | null;
     notes?: string | null;
     counselor_name?: string | null;

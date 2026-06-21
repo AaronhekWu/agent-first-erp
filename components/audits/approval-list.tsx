@@ -129,7 +129,7 @@ export function ApprovalList({ rows, canReview }: { rows: ApprovalRow[]; canRevi
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium text-slate-900">{row.title}</span>
-                      <span className={cn("inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs ring-1 ring-inset", meta.cls)}>
+                      <span className={cn("inline-flex shrink-0 items-center whitespace-nowrap gap-1 rounded-md px-2 py-0.5 text-xs ring-1 ring-inset", meta.cls)}>
                         <Icon className="h-3 w-3" />
                         {meta.label}
                       </span>

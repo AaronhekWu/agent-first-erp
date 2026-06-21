@@ -71,12 +71,12 @@ export default async function CoursesPage({ searchParams }: PageProps) {
 function StatCard({ label, value, Icon, bg, color }: { label: string; value: number | string; Icon: typeof BookOpen; bg: string; color: string }) {
   return (
     <div className="flex items-center gap-4 rounded-2xl bg-white p-5 shadow-card">
-      <div className={cn("grid h-12 w-12 place-items-center rounded-xl", bg)}>
+      <div className={cn("grid h-12 w-12 shrink-0 place-items-center rounded-xl", bg)}>
         <Icon className={cn("h-6 w-6", color)} />
       </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-sm text-slate-500">{label}</div>
-        <div className="mt-0.5 text-2xl font-semibold tracking-tight text-slate-900">
+      <div className="min-w-0 flex-1 overflow-hidden">
+        <div className="truncate text-sm text-slate-500">{label}</div>
+        <div className="mt-0.5 truncate text-xl font-semibold text-slate-900">
           {typeof value === "number" ? value.toLocaleString("zh-CN") : value}
         </div>
       </div>

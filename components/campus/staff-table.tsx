@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Edit2, Plus, Trash2, UserPlus } from "lucide-react";
+import { Edit2, MoreHorizontal, Plus, Trash2, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { requestApproval } from "@/lib/api/approvals-client";
 import { maskPhone } from "@/lib/format";
@@ -33,6 +33,25 @@ interface Props {
 export function StaffTable({ staff, departments, initialQuery = "" }: Props) {
   const router = useRouter();
   const [editing, setEditing] = useState<StaffRow | "new" | null>(null);
+  const [actionMenuId, setActionMenuId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setActionMenuId(null);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setActionMenuId(null);
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
   const [filter, setFilter] = useState(initialQuery);
   const [roleFilter, setRoleFilter] = useState("");
   const [page, setPage] = useState(1);
@@ -122,7 +141,7 @@ export function StaffTable({ staff, departments, initialQuery = "" }: Props) {
               <th className="px-3 py-3 text-left">手机号</th>
               <th className="px-3 py-3 text-left">邮箱</th>
               <th className="px-3 py-3 text-center">权限数</th>
-              <th className="px-3 py-3 text-center">操作</th>
+              <th className="px-3 py-3 text-left">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -141,7 +160,7 @@ export function StaffTable({ staff, departments, initialQuery = "" }: Props) {
                   <td className="px-4 py-3">
                     <div className="font-medium text-slate-800">{s.display_name}</div>
                     {s.is_dept_manager && (
-                      <span className="mt-0.5 inline-flex rounded bg-amber-50 px-1 py-0.5 text-[10px] text-amber-700">
+                      <span className="mt-0.5 inline-flex shrink-0 whitespace-nowrap rounded bg-amber-50 px-1 py-0.5 text-[10px] text-amber-700">
                         部门主管
                       </span>
                     )}
@@ -150,7 +169,7 @@ export function StaffTable({ staff, departments, initialQuery = "" }: Props) {
                     {role ? (
                       <span
                         className={cn(
-                          "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
+                          "inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
                           cls,
                         )}
                       >
@@ -166,21 +185,43 @@ export function StaffTable({ staff, departments, initialQuery = "" }: Props) {
                   <td className="px-3 py-3 text-center text-slate-600">
                     {Array.isArray(s.permissions) ? s.permissions.length : 0}
                   </td>
-                  <td className="px-3 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => setEditing(s)}
-                        className="inline-flex h-7 items-center gap-1 rounded border border-slate-200 bg-white px-2 text-xs text-slate-600 hover:bg-slate-50"
+                  <td className="relative px-3 py-3 text-center">
+                    <button
+                      onClick={() => setActionMenuId(actionMenuId === s.id ? null : s.id)}
+                      className={cn(
+                        "grid h-8 w-8 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600",
+                        actionMenuId === s.id && "bg-slate-100 text-slate-700",
+                      )}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                    {actionMenuId === s.id && (
+                      <div
+                        ref={menuRef}
+                        className="absolute right-0 top-11 z-40 min-w-36 rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
                       >
-                        <Edit2 className="h-3 w-3" /> 编辑 & 权限
-                      </button>
-                      <button
-                        onClick={() => handleDelete(s)}
-                        className="inline-flex h-7 items-center gap-1 rounded border border-red-100 bg-red-50 px-2 text-xs text-red-600 hover:bg-red-100"
-                      >
-                        <Trash2 className="h-3 w-3" /> 停用
-                      </button>
-                    </div>
+                        <button
+                          onClick={() => {
+                            setActionMenuId(null);
+                            setEditing(s);
+                          }}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                        >
+                          <Edit2 className="h-4 w-4 text-slate-400" />
+                          编辑 & 权限
+                        </button>
+                        <button
+                          onClick={() => {
+                            setActionMenuId(null);
+                            handleDelete(s);
+                          }}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-400" />
+                          停用
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               );

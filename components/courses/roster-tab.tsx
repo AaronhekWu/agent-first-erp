@@ -66,7 +66,7 @@ export function RosterTab({ enrollments, course, onMutate }: Props) {
                   </td>
                   <td className="px-3 py-2 font-mono text-xs text-slate-500">{e.student_code ?? "—"}</td>
                   <td className="px-3 py-2">
-                    <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-xs ring-1 ring-inset", st.cls)}>
+                    <span className={cn("inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs ring-1 ring-inset", st.cls)}>
                       {st.label}
                     </span>
                   </td>

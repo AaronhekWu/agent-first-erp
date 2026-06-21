@@ -36,6 +36,14 @@ export function createStudent(input: CreateStudentInput) {
   return callRpc("rpc_create_student", { ...input });
 }
 
+export function graduateStudent(input: { p_student_id: string; p_graduated_at: string; p_note?: string | null }) {
+  return callRpc("rpc_graduate_student", { ...input });
+}
+
+export function reactivateStudent(input: { p_student_id: string; p_reason: string }) {
+  return callRpc("rpc_reactivate_student", { ...input });
+}
+
 // ============== 课程 ==============
 export interface CreateCourseInput {
   p_name: string;

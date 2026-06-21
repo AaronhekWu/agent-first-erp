@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
   Download,
+  Eye,
+  MoreHorizontal,
   RefreshCw,
   Settings2,
   Info,
@@ -17,6 +19,9 @@ import {
   UserCog,
   Mail,
   Trash2,
+  Wallet,
+  GraduationCap,
+  RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -29,6 +34,7 @@ import { StatusBadge } from "./status-badge";
 import { StudentDrawer } from "./student-drawer";
 import { Gate } from "@/lib/auth/permissions-context";
 import { requestApproval } from "@/lib/api/approvals-client";
+import { graduateStudent, reactivateStudent } from "@/lib/api/create";
 import type { StudentRow } from "@/lib/api/students";
 
 interface Props {
@@ -40,29 +46,50 @@ interface Props {
 
 const COLS: { key: string; label: string; w?: string; align?: string }[] = [
   { key: "name", label: "姓名", w: "w-24" },
-  { key: "phone", label: "手机号", w: "w-32" },
+  { key: "phone", label: "手机号", w: "w-36" },
   { key: "status", label: "状态", w: "w-24" },
-  { key: "school", label: "学校", w: "w-32" },
+  { key: "school", label: "学校", w: "w-36" },
   { key: "grade", label: "年级", w: "w-16" },
-  { key: "department_name", label: "部门", w: "w-28" },
-  { key: "counselor_name", label: "顾问", w: "w-20" },
-  { key: "balance", label: "余额", w: "w-24", align: "text-right" },
-  { key: "total_recharged", label: "累计充值", w: "w-28", align: "text-right" },
+  { key: "department_name", label: "部门", w: "w-32" },
+  { key: "counselor_name", label: "顾问", w: "w-24" },
+  { key: "balance", label: "余额", w: "w-32", align: "text-right" },
+  { key: "total_recharged", label: "累计充值", w: "w-36", align: "text-right" },
   { key: "active_enrollment_count", label: "在读课程", w: "w-20", align: "text-center" },
-  { key: "last_followup_at", label: "最后跟进", w: "w-36" },
-  { key: "created_at", label: "创建时间", w: "w-28" },
-  { key: "action", label: "操作", w: "w-44", align: "text-right" },
+  { key: "last_followup_at", label: "最后跟进", w: "w-40" },
+  { key: "created_at", label: "创建时间", w: "w-32" },
+  { key: "action", label: "操作", w: "w-16", align: "text-left" },
 ];
 
 export function StudentTable({ rows, total, page, pageSize }: Props) {
   const router = useRouter();
   const sp = useSearchParams();
   const [active, setActive] = useState<StudentRow | null>(null);
+  const [actionMenuId, setActionMenuId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setActionMenuId(null);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setActionMenuId(null);
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [graduationTarget, setGraduationTarget] = useState<StudentRow | null>(null);
+  const [reactivationTarget, setReactivationTarget] = useState<StudentRow | null>(null);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const allOnPageIds = useMemo(
-    () => rows.filter((r) => r.status !== "inactive").map((r) => r.id),
+    () => rows.filter((r) => r.status === "active").map((r) => r.id),
     [rows],
   );
   const allSelected = allOnPageIds.length > 0 && allOnPageIds.every((id) => selected.has(id));
@@ -209,7 +236,7 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1450px] text-sm">
+        <table className="w-full min-w-[1550px] text-sm">
           <thead>
             <tr className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <th className="w-10 px-4 py-3">
@@ -254,7 +281,8 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
             )}
             {rows.map((r) => {
               const isChecked = selected.has(r.id);
-              const isInactive = r.status === "inactive";
+              const isActive = r.status === "active";
+              const isGraduated = r.status === "graduated";
               return (
               <tr
                 key={r.id}
@@ -265,7 +293,7 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
                 onClick={() => setActive(r)}
               >
                 <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                  {!isInactive && (
+                  {isActive && (
                     <button
                       onClick={() => toggleOne(r.id)}
                       className="text-slate-400 hover:text-brand-600"
@@ -328,39 +356,87 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
                   </div>
                 </td>
                 <td
-                  className="px-3 py-3 text-right"
+                  className="relative px-3 py-3 text-right"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="inline-flex items-center gap-1 whitespace-nowrap">
-                    <Gate keys="students.view">
-                      <Link
-                        href={`/students/${r.id}`}
-                        className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50"
-                      >
-                        查看详情
-                      </Link>
-                    </Gate>
-                    {!isInactive && (
-                      <>
-                        <Gate keys="finance.recharge">
-                          <Link
-                            href={`/finance?tab=recharge&student=${r.id}`}
-                            className="rounded bg-amber-50 border border-amber-200 px-2 py-1 text-xs text-amber-700 hover:bg-amber-100"
-                          >
-                            充值
-                          </Link>
-                        </Gate>
-                        <Gate keys="students.delete">
+                  <button
+                    onClick={() => setActionMenuId(actionMenuId === r.id ? null : r.id)}
+                    className={cn(
+                      "grid h-8 w-8 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600",
+                      actionMenuId === r.id && "bg-slate-100 text-slate-700",
+                    )}
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </button>
+                  {actionMenuId === r.id && (
+                    <div
+                      ref={menuRef}
+                      className="absolute right-0 top-11 z-40 min-w-32 rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+                    >
+                      <Gate keys="students.view">
+                        <Link
+                          href={`/students/${r.id}`}
+                          onClick={() => setActionMenuId(null)}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                        >
+                          <Eye className="h-4 w-4 text-slate-400" />
+                          查看详情
+                        </Link>
+                      </Gate>
+                      {isActive && (
+                        <>
+                          <Gate keys="finance.recharge">
+                            <Link
+                              href={`/finance?tab=recharge&student=${r.id}`}
+                              onClick={() => setActionMenuId(null)}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-amber-700 hover:bg-amber-50"
+                            >
+                              <Wallet className="h-4 w-4 text-amber-500" />
+                              充值
+                            </Link>
+                          </Gate>
+                          <Gate keys="students.graduate">
+                            <button
+                              onClick={() => {
+                                setActionMenuId(null);
+                                setGraduationTarget(r);
+                              }}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-blue-700 hover:bg-blue-50"
+                            >
+                              <GraduationCap className="h-4 w-4 text-blue-500" />
+                              毕业
+                            </button>
+                          </Gate>
+                          <Gate keys="students.delete">
+                            <button
+                              onClick={() => {
+                                setActionMenuId(null);
+                                requestStudentDelete(r);
+                              }}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4 text-red-400" />
+                              删除
+                            </button>
+                          </Gate>
+                        </>
+                      )}
+                      {isGraduated && (
+                        <Gate keys="students.graduate">
                           <button
-                            onClick={() => requestStudentDelete(r)}
-                            className="rounded border border-red-100 bg-red-50 px-2 py-1 text-xs text-red-600 hover:bg-red-100"
+                            onClick={() => {
+                              setActionMenuId(null);
+                              setReactivationTarget(r);
+                            }}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-emerald-700 hover:bg-emerald-50"
                           >
-                            删除
+                            <RotateCcw className="h-4 w-4 text-emerald-500" />
+                            恢复在读
                           </button>
                         </Gate>
-                      </>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  )}
                 </td>
               </tr>
               );
@@ -381,6 +457,103 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
       </div>
 
       <StudentDrawer student={active} onClose={() => setActive(null)} />
+      {graduationTarget && (
+        <StudentStatusModal
+          student={graduationTarget}
+          mode="graduate"
+          onClose={() => setGraduationTarget(null)}
+          onDone={() => {
+            setGraduationTarget(null);
+            router.refresh();
+          }}
+        />
+      )}
+      {reactivationTarget && (
+        <StudentStatusModal
+          student={reactivationTarget}
+          mode="reactivate"
+          onClose={() => setReactivationTarget(null)}
+          onDone={() => {
+            setReactivationTarget(null);
+            router.refresh();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function StudentStatusModal({
+  student,
+  mode,
+  onClose,
+  onDone,
+}: {
+  student: StudentRow;
+  mode: "graduate" | "reactivate";
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const graduating = mode === "graduate";
+
+  const submit = async () => {
+    if (graduating && !date) return setError("请选择毕业日期");
+    if (!graduating && !reason.trim()) return setError("请填写恢复在读原因");
+    setSubmitting(true);
+    setError(null);
+    try {
+      if (graduating) {
+        await graduateStudent({ p_student_id: student.id, p_graduated_at: date, p_note: reason.trim() || null });
+      } else {
+        await reactivateStudent({ p_student_id: student.id, p_reason: reason.trim() });
+      }
+      onDone();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-900/40 p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
+        <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4">
+          {graduating ? <GraduationCap className="h-5 w-5 text-blue-600" /> : <RotateCcw className="h-5 w-5 text-emerald-600" />}
+          <h3 className="font-semibold text-slate-900">{graduating ? "办理毕业" : "恢复在读"}</h3>
+        </div>
+        <div className="space-y-4 px-5 py-4 text-sm">
+          <p className="text-slate-600">
+            学员：<span className="font-medium text-slate-900">{student.name}</span>
+          </p>
+          {graduating && (
+            <div className="rounded-md bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-700">
+              系统将确认该学员没有在读课程、账户余额及冻结金额均为零，并且没有待处理审批。毕业后保留全部历史记录。
+            </div>
+          )}
+          {graduating && (
+            <label className="block text-xs font-medium text-slate-600">
+              毕业日期
+              <input type="date" value={date} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setDate(e.target.value)} className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm focus:border-brand-500 focus:outline-none" />
+            </label>
+          )}
+          <label className="block text-xs font-medium text-slate-600">
+            {graduating ? "毕业备注（可选）" : "恢复原因"}
+            <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder={graduating ? "例如：完成全部课程，正常毕业" : "必填，例如：学员重新报名学习"} className="mt-1 min-h-20 w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+          </label>
+          {error && <div className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">{error}</div>}
+        </div>
+        <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-3">
+          <button type="button" onClick={onClose} disabled={submitting} className="h-9 rounded-md border border-slate-200 bg-white px-4 text-sm text-slate-700">取消</button>
+          <button type="button" onClick={submit} disabled={submitting} className={cn("h-9 rounded-md px-4 text-sm font-medium text-white disabled:opacity-50", graduating ? "bg-blue-600 hover:bg-blue-700" : "bg-emerald-600 hover:bg-emerald-700")}>
+            {submitting ? "处理中…" : graduating ? "确认毕业" : "确认恢复"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -11,6 +11,7 @@ export const PERMISSION_CATALOG: PermissionItem[] = [
   { key: "students.view",   label: "查看学员", group: "学员" },
   { key: "students.create", label: "新增学员", group: "学员" },
   { key: "students.update", label: "编辑学员", group: "学员" },
+  { key: "students.graduate", label: "办理毕业与恢复在读", group: "学员" },
   { key: "students.delete", label: "删除学员", group: "学员" },
   { key: "students.export", label: "导出学员", group: "学员" },
 
