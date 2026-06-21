@@ -27,12 +27,13 @@ const ROLE_CLS: Record<string, string> = {
 interface Props {
   staff: StaffRow[];
   departments: DepartmentDetail[];
+  initialQuery?: string;
 }
 
-export function StaffTable({ staff, departments }: Props) {
+export function StaffTable({ staff, departments, initialQuery = "" }: Props) {
   const router = useRouter();
   const [editing, setEditing] = useState<StaffRow | "new" | null>(null);
-  const [filter, setFilter] = useState("");
+  const [filter, setFilter] = useState(initialQuery);
   const [roleFilter, setRoleFilter] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);

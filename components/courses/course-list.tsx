@@ -2,9 +2,12 @@ import { CourseCard } from "./course-card";
 import { UrlListPagination } from "@/components/ui/url-list-pagination";
 import type { CourseRow } from "@/lib/api/courses";
 
-export function CourseList({ courses, page, pageSize, emptyMessage }: { courses: CourseRow[]; page: number; pageSize: number; emptyMessage: string }) {
+export function CourseList({ courses, page, pageSize, emptyMessage, selectedCourseId }: { courses: CourseRow[]; page: number; pageSize: number; emptyMessage: string; selectedCourseId?: string }) {
   const totalPages = Math.max(1, Math.ceil(courses.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
+  const selectedIndex = selectedCourseId ? courses.findIndex((course) => course.course_id === selectedCourseId) : -1;
+  const currentPage = selectedIndex >= 0
+    ? Math.floor(selectedIndex / pageSize) + 1
+    : Math.min(page, totalPages);
   const pagedCourses = courses.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
@@ -15,7 +18,7 @@ export function CourseList({ courses, page, pageSize, emptyMessage }: { courses:
             {emptyMessage}
           </div>
         )}
-        {pagedCourses.map((course) => <CourseCard key={course.course_id} course={course} />)}
+        {pagedCourses.map((course) => <CourseCard key={course.course_id} course={course} initialOpen={course.course_id === selectedCourseId} />)}
       </div>
       <UrlListPagination page={currentPage} pageSize={pageSize} totalItems={courses.length} />
     </div>

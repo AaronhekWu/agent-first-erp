@@ -8,9 +8,10 @@ import { lessonProgress } from "@/lib/course-lifecycle";
 import { formatDate } from "@/lib/format";
 import type { CourseRow } from "@/lib/api/courses";
 
-export function CoursePlanTab({ course, onMutate }: { course: CourseRow; onMutate: () => Promise<void> }) {
+export function CoursePlanTab({ course, canEdit, onMutate }: { course: CourseRow; canEdit: boolean; onMutate: () => Promise<void> }) {
   const progress = lessonProgress(course);
   const [totalLessons, setTotalLessons] = useState(String(course.total_lessons ?? ""));
+  const [unitPrice, setUnitPrice] = useState(String(course.fee ?? ""));
   const [startDate, setStartDate] = useState(course.start_date ?? "");
   const [endDate, setEndDate] = useState(course.end_date ?? "");
   const [saving, setSaving] = useState(false);
@@ -19,15 +20,19 @@ export function CoursePlanTab({ course, onMutate }: { course: CourseRow; onMutat
 
   useEffect(() => {
     setTotalLessons(String(course.total_lessons ?? ""));
+    setUnitPrice(String(course.fee ?? ""));
     setStartDate(course.start_date ?? "");
     setEndDate(course.end_date ?? "");
   }, [course]);
 
   const save = async () => {
     const count = Number(totalLessons);
+    const price = Number(unitPrice);
     if (!Number.isInteger(count) || count <= 0) return setError("计划课次必须是大于 0 的整数");
     if (count < progress.completed) return setError(`计划总课次不能少于已上课次（${progress.completed} 节）`);
-    if (startDate && endDate && endDate < startDate) return setError("结束日期不能早于开始日期");
+    if (price <= 0) return setError("标准课时单价必须大于 0");
+    if (!startDate || !endDate) return setError("课程开始日期和结束日期必填");
+    if (endDate < startDate) return setError("结束日期不能早于开始日期");
     setSaving(true);
     setError(null);
     setSaved(false);
@@ -35,8 +40,9 @@ export function CoursePlanTab({ course, onMutate }: { course: CourseRow; onMutat
       await updateCoursePlan({
         courseId: course.course_id,
         totalLessons: count,
-        startDate: startDate || null,
-        endDate: endDate || null,
+        unitPrice: price,
+        startDate,
+        endDate,
       });
       setSaved(true);
       await onMutate();
@@ -70,17 +76,20 @@ export function CoursePlanTab({ course, onMutate }: { course: CourseRow; onMutat
         </div>
       </div>
 
-      {course.status !== "archived" && (
+      {course.status !== "archived" && canEdit && (
         <div className="rounded-lg border border-slate-200 p-4">
           <h3 className="mb-4 text-sm font-medium text-slate-800">编辑课程计划</h3>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-4">
             <Field label="计划总课次" required>
               <input type="number" min={Math.max(1, progress.completed)} step={1} className={inputCls} value={totalLessons} onChange={(event) => setTotalLessons(event.target.value)} />
             </Field>
-            <Field label="开始日期">
+            <Field label="标准课时单价" required>
+              <input type="number" min={0.01} step="0.01" className={inputCls} value={unitPrice} onChange={(event) => setUnitPrice(event.target.value)} />
+            </Field>
+            <Field label="开始日期" required>
               <input type="date" className={inputCls} value={startDate} onChange={(event) => setStartDate(event.target.value)} />
             </Field>
-            <Field label="结束日期">
+            <Field label="结束日期" required>
               <input type="date" className={inputCls} value={endDate} onChange={(event) => setEndDate(event.target.value)} />
             </Field>
           </div>
@@ -92,6 +101,11 @@ export function CoursePlanTab({ course, onMutate }: { course: CourseRow; onMutat
               {saving ? "保存中" : "保存计划"}
             </button>
           </div>
+        </div>
+      )}
+      {course.status !== "archived" && !canEdit && (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          当前账号可查看课程计划，但没有修改课时、价格或课程周期的权限。
         </div>
       )}
     </div>

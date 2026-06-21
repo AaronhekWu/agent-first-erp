@@ -33,7 +33,8 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
   const [level, setLevel] = useState("");
   const [description, setDescription] = useState("");
   const [capacity, setCapacity] = useState("20");
-  const [fee, setFee] = useState("0");
+  const [totalLessons, setTotalLessons] = useState("");
+  const [fee, setFee] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [departmentId, setDepartmentId] = useState("");
@@ -49,7 +50,8 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
     setLevel("");
     setDescription("");
     setCapacity("20");
-    setFee("0");
+    setTotalLessons("");
+    setFee("");
     setStartDate("");
     setEndDate("");
     setDepartmentId("");
@@ -61,6 +63,22 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
   const submit = async () => {
     if (!name.trim() || !subject.trim() || !level.trim()) {
       setError("课程名 / 学科 / 年级 必填");
+      return;
+    }
+    if (!Number.isInteger(Number(totalLessons)) || Number(totalLessons) <= 0) {
+      setError("计划总课时必须是大于 0 的整数");
+      return;
+    }
+    if (Number(fee) <= 0) {
+      setError("标准课时单价必须大于 0");
+      return;
+    }
+    if (!startDate || !endDate) {
+      setError("课程开始日期和结束日期必填");
+      return;
+    }
+    if (endDate < startDate) {
+      setError("结束日期不能早于开始日期");
       return;
     }
     setSubmitting(true);
@@ -76,8 +94,10 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
         p_start_date: startDate || null,
         p_end_date: endDate || null,
         p_department_id: departmentId || null,
-        p_schedule_info:
-          days.length > 0 ? { weekdays: days, time } : null,
+        p_schedule_info: {
+          total_lessons: Number(totalLessons),
+          ...(days.length > 0 ? { weekdays: days, time } : {}),
+        },
       });
       reset();
       onClose();
@@ -159,17 +179,28 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
             onChange={(e) => setCapacity(e.target.value)}
           />
         </Field>
-        <Field label="课程费用 (¥)">
+        <Field label="计划总课时" required>
           <input
             type="number"
-            min={0}
+            min={1}
+            step={1}
+            className={inputCls}
+            value={totalLessons}
+            onChange={(e) => setTotalLessons(e.target.value)}
+            placeholder="如 20"
+          />
+        </Field>
+        <Field label="标准课时单价 (¥)" required>
+          <input
+            type="number"
+            min={0.01}
             step="0.01"
             className={inputCls}
             value={fee}
             onChange={(e) => setFee(e.target.value)}
           />
         </Field>
-        <Field label="开始日期">
+        <Field label="开始日期" required>
           <input
             type="date"
             className={inputCls}
@@ -177,7 +208,7 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
             onChange={(e) => setStartDate(e.target.value)}
           />
         </Field>
-        <Field label="结束日期">
+        <Field label="结束日期" required>
           <input
             type="date"
             className={inputCls}

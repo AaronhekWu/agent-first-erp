@@ -35,13 +35,44 @@ export interface CourseEnrollment {
   student_phone: string | null;
   status: "enrolled" | "completed" | "transferred" | "cancelled";
   unit_price: number;
+  list_unit_price: number | null;
   total_lessons: number | null;
   consumed_lessons: number | null;
   remaining_lessons: number | null;
+  gross_amount: number | null;
+  discount_amount: number | null;
+  total_amount: number | null;
+  discount_type: string | null;
+  discount_value: number | null;
+  discount_reason: string | null;
+  source: string | null;
+  notes: string | null;
+  price_snapshot: Record<string, unknown>;
   balance: number;
   today_attendance_id: string | null;
   today_status: string | null;
   enrolled_at: string;
+}
+
+export interface CoursePricePlan {
+  id: string;
+  course_id: string;
+  name: string;
+  unit_price: number | null;
+  total_lessons: number | null;
+  total_price: number | null;
+  is_default: boolean;
+}
+
+export interface EnrollmentCampaign {
+  id: string;
+  name: string;
+  type: string;
+  description: string | null;
+  discount_type: string | null;
+  discount_value: number | null;
+  gift_lessons: number;
+  applicable_course_ids: string[] | null;
 }
 
 export interface ActiveCourseOption {

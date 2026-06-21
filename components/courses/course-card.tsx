@@ -19,9 +19,9 @@ const STATUS: Record<CourseLifecycle, { label: string; cls: string; ring: string
   completed: { label: "已结课", cls: "bg-blue-50 text-blue-700", ring: "ring-blue-200" },
 };
 
-export function CourseCard({ course }: { course: CourseRow }) {
+export function CourseCard({ course, initialOpen = false }: { course: CourseRow; initialOpen?: boolean }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const [busy, setBusy] = useState<"archive" | "delete" | "visibility" | null>(null);
   const cap = course.max_capacity ?? 0;
   const filled = course.active_enrolled ?? 0;

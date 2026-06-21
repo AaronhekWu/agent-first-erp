@@ -143,9 +143,13 @@ export interface EnrollStudentInput {
   p_campaign_id?: string | null;
   p_notes?: string | null;
   p_source?: string | null;
+  p_custom_discount_type?: string | null;
+  p_custom_discount_value?: number | null;
+  p_discount_reason?: string | null;
+  p_referrer_student_id?: string | null;
 }
 export function enrollStudent(input: EnrollStudentInput) {
-  return callRpc("rpc_enroll_student", { ...input });
+  return callRpc("rpc_enroll_student_v2", { ...input });
 }
 
 export interface DropEnrollmentInput {

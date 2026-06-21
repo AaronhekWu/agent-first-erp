@@ -7,11 +7,12 @@ import { CourseList } from "@/components/courses/course-list";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { getCourseLifecycle } from "@/lib/course-lifecycle";
+import { Gate } from "@/lib/auth/permissions-context";
 
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  searchParams: { page?: string; pageSize?: string; archived?: string };
+  searchParams: { page?: string; pageSize?: string; archived?: string; course?: string };
 }
 
 export default async function CoursesPage({ searchParams }: PageProps) {
@@ -45,7 +46,7 @@ export default async function CoursesPage({ searchParams }: PageProps) {
             <Archive className="h-4 w-4" />
             {showArchived ? "返回课程管理" : "查看归档课程"}
           </Link>
-          {!showArchived && <NewCourseButton departments={departments} />}
+          {!showArchived && <Gate keys="courses.create"><NewCourseButton departments={departments} /></Gate>}
         </div>
       </div>
 
@@ -61,6 +62,7 @@ export default async function CoursesPage({ searchParams }: PageProps) {
         page={page}
         pageSize={pageSize}
         emptyMessage={showArchived ? "暂无归档课程" : "暂无课程，点击右上角「新增课程」创建第一门课"}
+        selectedCourseId={searchParams.course}
       />
     </div>
   );

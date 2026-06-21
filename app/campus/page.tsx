@@ -5,7 +5,11 @@ import { StaffTable } from "@/components/campus/staff-table";
 
 export const dynamic = "force-dynamic";
 
-export default async function CampusPage() {
+interface PageProps {
+  searchParams: { tab?: string; q?: string };
+}
+
+export default async function CampusPage({ searchParams }: PageProps) {
   const [departments, staff] = await Promise.all([
     listDepartmentsDetail(),
     listStaff(),
@@ -21,6 +25,8 @@ export default async function CampusPage() {
       </div>
 
       <Tabs
+        defaultActiveKey={searchParams.tab === "staff" ? "staff" : "departments"}
+        queryParam="tab"
         tabs={[
           {
             key: "departments",
@@ -30,7 +36,7 @@ export default async function CampusPage() {
           {
             key: "staff",
             label: "教师 / 顾问",
-            content: <StaffTable staff={staff} departments={departments} />,
+            content: <StaffTable staff={staff} departments={departments} initialQuery={searchParams.q} />,
           },
         ]}
       />

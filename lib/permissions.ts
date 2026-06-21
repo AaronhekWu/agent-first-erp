@@ -17,6 +17,10 @@ export const PERMISSION_CATALOG: PermissionItem[] = [
   { key: "courses.view",    label: "查看课程", group: "课程" },
   { key: "courses.create",  label: "新增课程", group: "课程" },
   { key: "courses.update",  label: "编辑课程", group: "课程" },
+  { key: "courses.plan",    label: "维护课程计划与标准价格", group: "课程" },
+  { key: "courses.pricing", label: "设置自定义报名优惠", group: "课程" },
+  { key: "courses.enroll",  label: "办理学员报名", group: "课程" },
+  { key: "courses.attendance", label: "课程点名", group: "课程" },
   { key: "courses.archive", label: "归档课程", group: "课程" },
 
   { key: "finance.view",     label: "查看财务", group: "财务" },
@@ -36,11 +40,11 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
   admin: PERMISSION_CATALOG.map((p) => p.key),
   counselor: [
     "students.view", "students.create", "students.update",
-    "courses.view", "finance.view", "finance.recharge",
+    "courses.view", "courses.enroll", "finance.view", "finance.recharge",
     "followups.view", "followups.create",
   ],
   teacher: [
-    "students.view", "courses.view", "courses.update", "followups.view",
+    "students.view", "courses.view", "courses.attendance", "followups.view",
   ],
   viewer: PERMISSION_CATALOG
     .filter((p) => p.key.endsWith(".view"))

@@ -3,19 +3,25 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSelectedLayoutSegments } from "next/navigation";
-import { Bell, CheckSquare, Clock, HelpCircle, Menu, Search, Wallet } from "lucide-react";
+import { Bell, BookOpen, Building2, CheckSquare, Clock, HelpCircle, Menu, Search, UserRound, Users, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { searchStudents } from "@/lib/api/courses-client";
 import { getNotifications, type NotificationItem } from "@/lib/api/notifications-client";
 import { useLayout } from "./layout-context";
 import { UserMenu } from "./user-menu";
-import type { StudentSearchResult } from "@/lib/api/courses";
+import type { GlobalSearchResponse, SearchKind } from "@/lib/api/global-search";
 
 const NOTICE_ICON: Record<NotificationItem["kind"], typeof Bell> = {
   approval: CheckSquare,
   balance: Wallet,
   followup: Clock,
 };
+
+const SEARCH_ICON = {
+  student: UserRound,
+  course: BookOpen,
+  staff: Users,
+  department: Building2,
+} satisfies Record<SearchKind, typeof Search>;
 
 const SEGMENT_LABELS: Record<string, string> = {
   dashboard: "仪表盘",
@@ -64,7 +70,7 @@ export function Topbar() {
   const crumbs = buildBreadcrumb(segments);
   const { toggle } = useLayout();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<StudentSearchResult[]>([]);
+  const [suggestions, setSuggestions] = useState<GlobalSearchResponse | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [notices, setNotices] = useState<NotificationItem[]>([]);
@@ -99,20 +105,24 @@ export function Topbar() {
 
   useEffect(() => {
     if (!query.trim()) {
-      setResults([]);
+      setSuggestions(null);
       return;
     }
-    let cancelled = false;
+    const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
-        const rows = await searchStudents(query.trim(), 6);
-        if (!cancelled) setResults(rows);
+        const response = await fetch(`/api/search?q=${encodeURIComponent(query.trim())}`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("search failed");
+        const data = await response.json() as GlobalSearchResponse;
+        setSuggestions(data);
       } catch {
-        if (!cancelled) setResults([]);
+        if (!controller.signal.aborted) setSuggestions(null);
       }
     }, 220);
     return () => {
-      cancelled = true;
+      controller.abort();
       window.clearTimeout(timer);
     };
   }, [query]);
@@ -171,13 +181,13 @@ export function Topbar() {
           {searchOpen && (
             <div className="absolute right-0 top-11 z-30 w-96 rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
               <div className="px-2 py-1.5 text-xs text-slate-400">
-                搜索学员姓名、手机号或编号
+                搜索学员、课程、员工或部门
               </div>
               {query.trim() === "" ? (
                 <div className="px-2 py-6 text-center text-sm text-slate-400">
                   输入关键词开始搜索
                 </div>
-              ) : results.length === 0 ? (
+              ) : suggestions?.total === 0 ? (
                 <button
                   type="button"
                   onClick={goSearch}
@@ -186,23 +196,32 @@ export function Topbar() {
                   查看「{query.trim()}」的完整搜索结果
                 </button>
               ) : (
-                <div className="space-y-1">
-                  {results.map((s) => (
-                    <Link
-                      key={s.id}
-                      href={`/students/${s.id}`}
-                      onClick={() => setSearchOpen(false)}
-                      className="flex items-center justify-between rounded-md px-2 py-2 hover:bg-slate-50"
-                    >
-                      <span>
-                        <span className="text-sm font-medium text-slate-800">{s.name}</span>
-                        <span className="ml-2 font-mono text-[11px] text-slate-400">
-                          {s.student_code ?? "—"}
-                        </span>
-                      </span>
-                      <span className="text-xs text-slate-400">{s.status}</span>
-                    </Link>
-                  ))}
+                <div className="max-h-[28rem] space-y-2 overflow-y-auto">
+                  {suggestions?.groups.map((group) => {
+                    if (group.items.length === 0) return null;
+                    const Icon = SEARCH_ICON[group.kind];
+                    return (
+                      <div key={group.kind}>
+                        <div className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium text-slate-400">
+                          <Icon className="h-3 w-3" /> {group.label}
+                        </div>
+                        {group.items.map((item) => (
+                          <Link
+                            key={`${item.kind}-${item.id}`}
+                            href={item.href}
+                            onClick={() => setSearchOpen(false)}
+                            className="flex items-center justify-between gap-3 rounded-md px-2 py-2 hover:bg-slate-50"
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-medium text-slate-800">{item.title}</span>
+                              <span className="block truncate text-[11px] text-slate-400">{item.subtitle}</span>
+                            </span>
+                            {item.meta && <span className="shrink-0 text-[11px] text-slate-400">{item.meta}</span>}
+                          </Link>
+                        ))}
+                      </div>
+                    );
+                  })}
                   <button
                     type="button"
                     onClick={goSearch}

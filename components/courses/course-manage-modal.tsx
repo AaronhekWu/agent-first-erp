@@ -11,6 +11,7 @@ import { EnrollTab } from "./enroll-tab";
 import { AttendanceTab } from "./attendance-tab";
 import { CoursePlanTab } from "./course-plan-tab";
 import { getCourseLifecycle } from "@/lib/course-lifecycle";
+import { usePermissions } from "@/lib/auth/permissions-context";
 
 interface Props {
   open: boolean;
@@ -28,6 +29,7 @@ const TABS = [
 type TabKey = (typeof TABS)[number]["key"];
 
 export function CourseManageModal({ open, onClose, course }: Props) {
+  const { has } = usePermissions();
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("plan");
   const [classDate, setClassDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
@@ -71,7 +73,7 @@ export function CourseManageModal({ open, onClose, course }: Props) {
             <h2 className="text-lg font-semibold text-slate-900">{course.course_name}</h2>
             <p className="mt-0.5 text-xs text-slate-500">
               {course.subject ?? "—"} · {course.level ?? "—"} · 容量 {course.active_enrolled}/
-              {course.max_capacity ?? "∞"} · 学费 ¥{Number(course.fee).toLocaleString()}
+              {course.max_capacity ?? "∞"} · 标准课时单价 ¥{Number(course.fee).toLocaleString()}
             </p>
           </div>
           <button
@@ -88,13 +90,24 @@ export function CourseManageModal({ open, onClose, course }: Props) {
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              disabled={(t.key === "enroll" && enrollmentClosed) || (t.key === "attendance" && lifecycle === "completed")}
+              disabled={
+                (t.key === "enroll" && (enrollmentClosed || !has("courses.enroll")))
+                || (t.key === "attendance" && (lifecycle === "completed" || !has("courses.attendance")))
+              }
               className={cn(
                 "relative inline-flex items-center gap-1.5 px-4 py-3 text-sm transition-colors",
                 tab === t.key ? "text-brand-600 font-medium" : "text-slate-500 hover:text-slate-700",
                 "disabled:cursor-not-allowed disabled:text-slate-300",
               )}
-              title={t.key === "enroll" && enrollmentClosed ? "当前课程已停止招生" : undefined}
+              title={
+                t.key === "enroll" && enrollmentClosed
+                  ? "当前课程已停止招生"
+                  : t.key === "enroll" && !has("courses.enroll")
+                    ? "当前账号没有报名权限"
+                    : t.key === "attendance" && !has("courses.attendance")
+                      ? "当前账号没有点名权限"
+                      : undefined
+              }
             >
               <t.Icon className="h-4 w-4" />
               {t.label}
@@ -115,7 +128,7 @@ export function CourseManageModal({ open, onClose, course }: Props) {
           )}
           {!loading && !error && (
             <>
-              {tab === "plan" && <CoursePlanTab course={course} onMutate={handleMutation} />}
+              {tab === "plan" && <CoursePlanTab course={course} canEdit={has("courses.plan")} onMutate={handleMutation} />}
               {tab === "roster" && (
                 <RosterTab
                   enrollments={enrollments}
