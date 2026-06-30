@@ -34,6 +34,7 @@ import { StatusBadge } from "./status-badge";
 import { StudentDrawer } from "./student-drawer";
 import { Gate } from "@/lib/auth/permissions-context";
 import { requestApproval } from "@/lib/api/approvals-client";
+import { batchDeleteStudents } from "@/lib/api/students-edge-client";
 import { graduateStudent, reactivateStudent } from "@/lib/api/create";
 import type { StudentRow } from "@/lib/api/students";
 
@@ -132,6 +133,27 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
         `\n\n该批量操作已收敛到 Edge Function 路径，待接入后将真实执行。`,
     );
 
+  const [batchDeleting, setBatchDeleting] = useState(false);
+  const batchDelete = async () => {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    const names = selectedRows.map((r) => `· ${r.name} (${r.student_code ?? r.id.slice(0, 8)})`).join("\n");
+    if (!confirm(`确认删除以下 ${ids.length} 名学员？将通过管理员边缘函数立即软删除（不可撤销）：\n\n${names}`)) {
+      return;
+    }
+    setBatchDeleting(true);
+    try {
+      const r = await batchDeleteStudents(ids);
+      alert(`已删除 ${r.deleted} / ${r.requested} 名学员`);
+      clearSelection();
+      router.refresh();
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setBatchDeleting(false);
+    }
+  };
+
   const requestStudentDelete = async (student: StudentRow) => {
     const blockers: string[] = [];
     if (student.status !== "active") {
@@ -187,7 +209,7 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
             <BatchBtn icon={Mail} label="批量发短信" onClick={() => batchAction("批量发短信")} />
             <BatchBtn icon={Download} label="导出选中" onClick={() => batchAction("导出选中学员")} />
             <Gate keys="students.delete">
-              <BatchBtn icon={Trash2} label="批量删除" danger onClick={() => batchAction("批量删除")} />
+              <BatchBtn icon={Trash2} label={batchDeleting ? "删除中…" : "批量删除"} danger onClick={batchDelete} />
             </Gate>
           </div>
         </div>
