@@ -20,7 +20,7 @@ export function isValidPhone(input: string | null | undefined): boolean {
 }
 
 export function maskPhone(phone: string | null | undefined): string {
-  if (!phone) return "—";
+  if (!phone) return "未填写";
   const digits = phone.replace(/\D/g, "");
   if (digits.length < 7) return phone;
   return `${digits.slice(0, 3)}****${digits.slice(-4)}`;
@@ -30,9 +30,9 @@ export function formatDate(
   iso: string | null | undefined,
   withTime = false,
 ): string {
-  if (!iso) return "—";
+  if (!iso) return "暂无";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "暂无";
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
@@ -53,7 +53,7 @@ export function followupTypeLabel(t: string | null | undefined): string {
     case "other":
       return "其他";
     default:
-      return "—";
+      return "未记录";
   }
 }
 
@@ -66,6 +66,6 @@ export function studentStatusLabel(s: string | null | undefined): string {
     case "graduated":
       return "已毕业";
     default:
-      return s ?? "—";
+      return s ?? "未知";
   }
 }

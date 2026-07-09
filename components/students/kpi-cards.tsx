@@ -29,7 +29,7 @@ function Card({ label, value, hint, Icon, iconBg, iconColor }: CardProps) {
 }
 
 function Delta({ value, suffix }: { value: number | null; suffix?: string }) {
-  if (value === null || value === undefined) return <span>—</span>;
+  if (value === null || value === undefined) return <span>暂无</span>;
   if (value === 0) return <span className="text-slate-400">持平</span>;
   const up = value > 0;
   const Arrow = up ? ArrowUp : ArrowDown;

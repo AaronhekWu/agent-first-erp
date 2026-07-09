@@ -175,10 +175,10 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
                       <td className="px-3 py-2 text-slate-600">{formatDate(t.created_at, true)}</td>
                       <td className="px-3 py-2"><span className={cn("font-medium", meta.cls)}>{meta.label}</span></td>
                       <td className="px-3 py-2 text-slate-700">
-                        {t.student_name ?? "—"}
+                        {t.student_name ?? "未知学员"}
                         {t.student_code && <span className="ml-1 font-mono text-[11px] text-slate-400">{t.student_code}</span>}
                       </td>
-                      <td className="px-3 py-2 text-slate-600">{t.description ?? "—"}</td>
+                      <td className="px-3 py-2 text-slate-600">{t.description ?? "无备注"}</td>
                       <td className={cn("px-3 py-2 text-right tabular-nums", meta.cls)}>{formatCurrency(t.amount)}</td>
                       <td className="px-3 py-2 text-right tabular-nums text-slate-500">
                         {formatCurrency(t.balance_before)} → <span className="text-slate-800">{formatCurrency(t.balance_after)}</span>

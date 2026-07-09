@@ -76,7 +76,7 @@ export function ProfileForm({ current }: Props) {
           <div className="mt-0.5 text-xs text-slate-500">
             角色：{current?.primary_role ?? "未设置（接入登录后自动同步）"}
           </div>
-          <div className="font-mono text-[11px] text-slate-400">{current?.id ?? "—"}</div>
+          <div className="font-mono text-[11px] text-slate-400">{current?.id ?? "未登录"}</div>
         </div>
       </div>
 

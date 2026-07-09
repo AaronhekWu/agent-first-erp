@@ -125,7 +125,7 @@ export function StaffEditModal({ open, onClose, editing, departments }: Props) {
             className={inputCls}
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="如 李老师"
+            placeholder=""
           />
         </Field>
         <Field label="手机号">

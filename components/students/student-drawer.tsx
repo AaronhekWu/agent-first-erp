@@ -58,11 +58,11 @@ export function StudentDrawer({ student, onClose }: Props) {
           <div className="divide-y divide-slate-100">
             <Row
               label="学员编号"
-              value={student.student_code ?? "—"}
+              value={student.student_code ?? "无编号"}
             />
             <Row
               label="顾问"
-              value={student.counselor_name ?? "—"}
+              value={student.counselor_name ?? "未分配"}
             />
             <Row
               label="当前余额"
@@ -91,12 +91,12 @@ export function StudentDrawer({ student, onClose }: Props) {
                   <div className="text-right leading-tight">
                     <div>{formatDate(student.last_followup_at, true)}</div>
                     <div className="text-xs text-slate-400">
-                      {student.counselor_name ?? "—"}{" "}
+                      {student.counselor_name ?? "未分配"}{" "}
                       {followupTypeLabel(student.last_followup_type)}
                     </div>
                   </div>
                 ) : (
-                  "—"
+                  "暂无跟进"
                 )
               }
             />

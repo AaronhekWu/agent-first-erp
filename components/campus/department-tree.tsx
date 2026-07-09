@@ -152,7 +152,7 @@ export function DepartmentTree({ departments, staff }: Props) {
                 </div>
                 <div>
                   <div className="text-xs text-slate-400">说明</div>
-                  <div className="text-slate-600">{selected.description ?? "—"}</div>
+                  <div className="text-slate-600">{selected.description ?? "未填写"}</div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <Stat label="成员" value={selectedMembers.length} />

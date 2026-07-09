@@ -41,7 +41,7 @@ export function StudentPicker({ value, onChange, placeholder }: Props) {
         <div>
           <div className="text-sm font-medium text-slate-800">{value.name}</div>
           <div className="text-xs text-slate-500">
-            {value.student_code ?? "—"} · {maskPhone(value.phone)} · {value.status}
+            {value.student_code ?? "无编号"} · {maskPhone(value.phone)} · {value.status}
           </div>
         </div>
         <button onClick={() => onChange(null)} className="grid h-7 w-7 place-items-center rounded text-slate-500 hover:bg-slate-200">
@@ -82,7 +82,7 @@ export function StudentPicker({ value, onChange, placeholder }: Props) {
                 <div>
                   <div className="text-sm font-medium text-slate-800">{s.name}</div>
                   <div className="text-xs text-slate-500">
-                    {s.student_code ?? "—"} · {maskPhone(s.phone)}
+                    {s.student_code ?? "无编号"} · {maskPhone(s.phone)}
                   </div>
                 </div>
                 <span className="text-[11px] text-slate-400">{s.status}</span>

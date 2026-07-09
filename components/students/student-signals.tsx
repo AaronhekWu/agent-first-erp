@@ -28,20 +28,20 @@ export function StudentSignalsCard({ signals }: { signals: StudentSignals }) {
           value={formatCurrency(f.balance)}
           hint={
             f.burn_rate_30d > 0
-              ? `日均 ${formatCurrency(f.burn_rate_30d)}, 可上 ${f.days_left_at_rate ?? "—"} 天`
+              ? `日均 ${formatCurrency(f.burn_rate_30d)}, 可上 ${f.days_left_at_rate ?? "未知"} 天`
               : "近 30 天无消课"
           }
           tone={f.balance < 200 ? "red" : f.low_balance ? "amber" : "default"}
         />
         <Tile
           title="30 天出勤率"
-          value={a.rate_30d != null ? `${a.rate_30d}%` : "—"}
+          value={a.rate_30d != null ? `${a.rate_30d}%` : "暂无"}
           hint={`到 ${a.present_count_30d} · 迟 ${a.late_count_30d} · 缺 ${a.absent_count_30d}`}
           tone={a.rate_30d != null && a.rate_30d < 70 ? "amber" : "default"}
         />
         <Tile
           title="跟进"
-          value={signals.followups.days_since_last != null ? `${signals.followups.days_since_last} 天前` : "—"}
+          value={signals.followups.days_since_last != null ? `${signals.followups.days_since_last} 天前` : "暂无"}
           hint={signals.followups.overdue_count > 0 ? `${signals.followups.overdue_count} 条过期` : "正常"}
           tone={signals.followups.overdue_count > 0 || (signals.followups.days_since_last ?? 0) > 14 ? "amber" : "default"}
         />

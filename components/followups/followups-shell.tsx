@@ -119,7 +119,7 @@ export function FollowupsShell({ overview }: Props) {
                     )}
                   </div>
                   <div className="mt-0.5 flex items-center gap-2 text-[11px] text-slate-500">
-                    <span className="font-mono">{s.student_code ?? "—"}</span>
+                    <span className="font-mono">{s.student_code ?? "无编号"}</span>
                     <span>·</span>
                     <span className="tabular-nums">{formatCurrency(s.balance)}</span>
                   </div>
@@ -151,7 +151,7 @@ export function FollowupsShell({ overview }: Props) {
             </h3>
             {selectedStudent && (
               <p className="text-xs text-slate-500">
-                {selectedStudent.student_code ?? "—"} · 顾问 {selectedStudent.counselor_name ?? "—"} · 余额{" "}
+                {selectedStudent.student_code ?? "无编号"} · 顾问 {selectedStudent.counselor_name ?? "未分配"} · 余额{" "}
                 <span className="tabular-nums">{formatCurrency(selectedStudent.balance)}</span>
               </p>
             )}
@@ -209,7 +209,7 @@ export function FollowupsShell({ overview }: Props) {
                       <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[11px] text-blue-700">
                         {followupTypeLabel(f.type)}
                       </span>
-                      <span className="font-medium text-slate-800">{f.creator_name ?? "—"}</span>
+                      <span className="font-medium text-slate-800">{f.creator_name ?? "未知"}</span>
                       <span className="ml-auto text-xs text-slate-400">
                         {formatDate(f.created_at, true)}
                       </span>

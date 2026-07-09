@@ -334,13 +334,13 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
                 <td className="px-3 py-3">
                   <StatusBadge status={r.status} />
                 </td>
-                <td className="px-3 py-3 text-slate-600">{r.school ?? "—"}</td>
-                <td className="px-3 py-3 text-slate-600">{r.grade ?? "—"}</td>
+                <td className="px-3 py-3 text-slate-600">{r.school ?? "未填写"}</td>
+                <td className="px-3 py-3 text-slate-600">{r.grade ?? "未填写"}</td>
                 <td className="px-3 py-3 text-slate-600">
-                  {r.department_name ?? "—"}
+                  {r.department_name ?? "未分配"}
                 </td>
                 <td className="px-3 py-3 text-slate-600">
-                  {r.counselor_name ?? "—"}
+                  {r.counselor_name ?? "未分配"}
                 </td>
                 <td
                   className={cn(
@@ -361,12 +361,12 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
                     <div className="leading-tight">
                       <div>{formatDate(r.last_followup_at, true)}</div>
                       <div className="text-xs text-slate-400">
-                        {r.counselor_name ?? "—"}{" "}
+                        {r.counselor_name ?? "未分配"}{" "}
                         {followupTypeLabel(r.last_followup_type)}
                       </div>
                     </div>
                   ) : (
-                    "—"
+                    "暂无跟进"
                   )}
                 </td>
                 <td className="px-3 py-3 text-slate-600">

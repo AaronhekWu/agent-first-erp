@@ -15,7 +15,7 @@ export function UserMenu() {
   const { user } = usePermissions();
 
   const name = user.display_name || "未登录";
-  const roleLabel = user.primary_role ? ROLE_LABELS[user.primary_role] ?? user.primary_role : "—";
+  const roleLabel = user.primary_role ? ROLE_LABELS[user.primary_role] ?? user.primary_role : "未分配";
   const initial = name.slice(0, 1);
 
   useEffect(() => {

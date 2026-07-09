@@ -176,12 +176,12 @@ export function StaffTable({ staff, departments, initialQuery = "" }: Props) {
                         {ROLE_LABEL[role] ?? role}
                       </span>
                     ) : (
-                      <span className="text-slate-400">—</span>
+                      <span className="text-slate-400">未分配角色</span>
                     )}
                   </td>
-                  <td className="px-3 py-3 text-slate-600">{s.department_name ?? "—"}</td>
+                  <td className="px-3 py-3 text-slate-600">{s.department_name ?? "未分配"}</td>
                   <td className="px-3 py-3 text-slate-600">{maskPhone(s.phone)}</td>
-                  <td className="px-3 py-3 text-slate-600">{s.email ?? "—"}</td>
+                  <td className="px-3 py-3 text-slate-600">{s.email ?? "未填写"}</td>
                   <td className="px-3 py-3 text-center text-slate-600">
                     {Array.isArray(s.permissions) ? s.permissions.length : 0}
                   </td>

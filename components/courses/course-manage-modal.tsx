@@ -72,7 +72,7 @@ export function CourseManageModal({ open, onClose, course }: Props) {
           <div>
             <h2 className="text-lg font-semibold text-slate-900">{course.course_name}</h2>
             <p className="mt-0.5 text-xs text-slate-500">
-              {course.subject ?? "—"} · {course.level ?? "—"} · 容量 {course.active_enrolled}/
+              {course.subject ?? "未设科目"} · {course.level ?? "未设级别"} · 容量 {course.active_enrolled}/
               {course.max_capacity ?? "∞"} · 标准课时单价 ¥{Number(course.fee).toLocaleString()}
             </p>
           </div>

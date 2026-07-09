@@ -16,10 +16,20 @@ const SB_URL = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/$/, "");
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const SB_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
+// CORS: 前端 (SAE/CLB 域) 与 Supabase 网关不同源, 且带自定义头 x-user-jwt →
+// 浏览器必发 OPTIONS 预检; 不应答会导致前端 "Failed to fetch"。
+// 鉴权不靠 Origin (靠 x-user-jwt 的 admin 校验), 故放开 *。
+const CORS: Record<string, string> = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET, POST, OPTIONS",
+  "access-control-allow-headers": "authorization, apikey, content-type, x-user-jwt",
+  "access-control-max-age": "86400",
+};
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...CORS },
   });
 }
 
@@ -42,6 +52,9 @@ async function resolveCallerRole(userJwt: string): Promise<string | null> {
 }
 
 Deno.serve({ port: 8000 }, async (req: Request): Promise<Response> => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS });
+  }
   if (req.method === "GET") {
     return json({ ok: true, fn: "student-delete", admin_only: true });
   }

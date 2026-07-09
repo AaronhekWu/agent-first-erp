@@ -92,14 +92,14 @@ export default async function StudentDetailPage({ params }: Props) {
           <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm md:grid-cols-3">
             <InfoLine icon={Phone} label="手机号" value={maskPhone(s.phone)} />
             <InfoLine icon={User} label="性别" value={genderLabel(s.gender)} />
-            <InfoLine icon={Calendar} label="生日" value={s.birth_date ?? "—"} />
-            <InfoLine icon={BookOpen} label="学校" value={s.school ?? "—"} />
-            <InfoLine icon={BookOpen} label="年级" value={s.grade ?? "—"} />
-            <InfoLine icon={User} label="顾问" value={s.counselor_name ?? "—"} />
-            <InfoLine icon={User} label="部门" value={s.department_name ?? "—"} />
-            <InfoLine icon={FileText} label="来源" value={s.source ?? "—"} />
+            <InfoLine icon={Calendar} label="生日" value={s.birth_date ?? "未填写"} />
+            <InfoLine icon={BookOpen} label="学校" value={s.school ?? "未填写"} />
+            <InfoLine icon={BookOpen} label="年级" value={s.grade ?? "未填写"} />
+            <InfoLine icon={User} label="顾问" value={s.counselor_name ?? "未分配"} />
+            <InfoLine icon={User} label="部门" value={s.department_name ?? "未分配"} />
+            <InfoLine icon={FileText} label="来源" value={s.source ?? "未填写"} />
             {s.status === "graduated" && (
-              <InfoLine icon={GraduationCap} label="毕业日期" value={s.graduated_at ? formatDate(s.graduated_at) : "—"} />
+              <InfoLine icon={GraduationCap} label="毕业日期" value={s.graduated_at ? formatDate(s.graduated_at) : "暂无"} />
             )}
           </div>
 
@@ -152,7 +152,7 @@ export default async function StudentDetailPage({ params }: Props) {
               <tbody className="divide-y divide-slate-100">
                 {detail.enrollments.map((e) => (
                   <tr key={e.id}>
-                    <td className="px-3 py-2 text-slate-800">{e.course_name ?? "—"}</td>
+                    <td className="px-3 py-2 text-slate-800">{e.course_name ?? "未知课程"}</td>
                     <td className="px-3 py-2 text-slate-600">{e.status}</td>
                     <td className="px-3 py-2 text-right text-slate-600">
                       {e.used_lessons ?? 0} / {e.total_lessons ?? 0}
@@ -178,7 +178,7 @@ export default async function StudentDetailPage({ params }: Props) {
                     <span className="inline-flex rounded bg-blue-50 px-1.5 py-0.5 text-[11px] text-blue-700">
                       {followupTypeLabel(f.type)}
                     </span>
-                    <span className="text-slate-700">{f.creator_name ?? "—"}</span>
+                    <span className="text-slate-700">{f.creator_name ?? "未知"}</span>
                     <span className="ml-auto text-xs text-slate-400">
                       {formatDate(f.created_at, true)}
                     </span>
@@ -227,7 +227,7 @@ export default async function StudentDetailPage({ params }: Props) {
                       {TX_TYPE_LABEL[t.type] ?? t.type}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-slate-600">{t.description ?? "—"}</td>
+                  <td className="px-3 py-2 text-slate-600">{t.description ?? "无备注"}</td>
                   <td
                     className={`px-3 py-2 text-right tabular-nums ${TX_TYPE_CLS[t.type] ?? "text-slate-700"}`}
                   >
@@ -252,7 +252,7 @@ export default async function StudentDetailPage({ params }: Props) {
 function genderLabel(g?: string | null): string {
   if (g === "male") return "男";
   if (g === "female") return "女";
-  return "—";
+  return "未填写";
 }
 
 function InfoLine({

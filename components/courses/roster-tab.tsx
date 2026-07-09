@@ -64,7 +64,7 @@ export function RosterTab({ enrollments, course, onMutate }: Props) {
                     <div className="font-medium text-slate-800">{e.student_name}</div>
                     <div className="text-xs text-slate-400">{maskPhone(e.student_phone)}</div>
                   </td>
-                  <td className="px-3 py-2 font-mono text-xs text-slate-500">{e.student_code ?? "—"}</td>
+                  <td className="px-3 py-2 font-mono text-xs text-slate-500">{e.student_code ?? "无编号"}</td>
                   <td className="px-3 py-2">
                     <span className={cn("inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs ring-1 ring-inset", st.cls)}>
                       {st.label}
@@ -303,7 +303,7 @@ function TransferModal({
               <option value="">请选择课程</option>
               {courses.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name} ({c.subject ?? "—"} / {c.level ?? "—"})
+                  {c.name} ({c.subject ?? "未设科目"} / {c.level ?? "未设级别"})
                 </option>
               ))}
             </select>

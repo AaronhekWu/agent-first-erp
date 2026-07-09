@@ -132,7 +132,7 @@ export function NewStudentModal({ open, onClose, counselors, departments }: Prop
             className={inputCls}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="如 王梓涵"
+            placeholder=""
           />
         </Field>
         <Field label="手机号">
@@ -206,7 +206,7 @@ export function NewStudentModal({ open, onClose, counselors, departments }: Prop
             className={inputCls}
             value={parentName}
             onChange={(e) => setParentName(e.target.value)}
-            placeholder="如 王爸"
+            placeholder=""
           />
         </Field>
         <Field label="家长手机号">
@@ -221,6 +221,15 @@ export function NewStudentModal({ open, onClose, counselors, departments }: Prop
             <option value="">未指定</option>
             <option value="father">爸爸</option>
             <option value="mother">妈妈</option>
+            <option value="grandpa_paternal">爷爷</option>
+            <option value="grandma_paternal">奶奶</option>
+            <option value="grandpa_maternal">外公</option>
+            <option value="grandma_maternal">外婆</option>
+            <option value="brother">哥哥</option>
+            <option value="sister">姐姐</option>
+            <option value="uncle">叔叔/舅舅</option>
+            <option value="aunt">姑姑/阿姨</option>
+            <option value="guardian">其他监护人</option>
             <option value="other">其他</option>
           </select>
         </Field>

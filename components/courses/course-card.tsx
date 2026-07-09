@@ -80,8 +80,8 @@ export function CourseCard({ course, initialOpen = false }: { course: CourseRow;
                 </h3>
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
-                <span className="rounded bg-slate-100 px-1.5 py-0.5">{course.subject ?? "—"}</span>
-                <span className="rounded bg-slate-100 px-1.5 py-0.5">{course.level ?? "—"}</span>
+                <span className="rounded bg-slate-100 px-1.5 py-0.5">{course.subject ?? "未设科目"}</span>
+                <span className="rounded bg-slate-100 px-1.5 py-0.5">{course.level ?? "未设级别"}</span>
                 {course.department_name && (
                   <span className="rounded bg-blue-50 px-1.5 py-0.5 text-blue-700">{course.department_name}</span>
                 )}
