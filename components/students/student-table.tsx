@@ -8,7 +8,6 @@ import {
   ChevronRight,
   Download,
   Eye,
-  MoreHorizontal,
   RefreshCw,
   Settings2,
   Info,
@@ -58,32 +57,13 @@ const COLS: { key: string; label: string; w?: string; align?: string }[] = [
   { key: "active_enrollment_count", label: "在读课程", w: "w-20", align: "text-center" },
   { key: "last_followup_at", label: "最后跟进", w: "w-40" },
   { key: "created_at", label: "创建时间", w: "w-32" },
-  { key: "action", label: "操作", w: "w-16", align: "text-left" },
+  { key: "action", label: "操作", w: "w-40", align: "text-left" },
 ];
 
 export function StudentTable({ rows, total, page, pageSize }: Props) {
   const router = useRouter();
   const sp = useSearchParams();
   const [active, setActive] = useState<StudentRow | null>(null);
-  const [actionMenuId, setActionMenuId] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setActionMenuId(null);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setActionMenuId(null);
-    };
-    document.addEventListener("mousedown", handler);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", handler);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, []);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [graduationTarget, setGraduationTarget] = useState<StudentRow | null>(null);
   const [reactivationTarget, setReactivationTarget] = useState<StudentRow | null>(null);
@@ -377,88 +357,40 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
                     </div>
                   </div>
                 </td>
-                <td
-                  className="relative px-3 py-3 text-right"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button
-                    onClick={() => setActionMenuId(actionMenuId === r.id ? null : r.id)}
-                    className={cn(
-                      "grid h-8 w-8 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600",
-                      actionMenuId === r.id && "bg-slate-100 text-slate-700",
-                    )}
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </button>
-                  {actionMenuId === r.id && (
-                    <div
-                      ref={menuRef}
-                      className="absolute right-0 top-11 z-40 min-w-32 rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
-                    >
-                      <Gate keys="students.view">
-                        <Link
-                          href={`/students/${r.id}`}
-                          onClick={() => setActionMenuId(null)}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-                        >
-                          <Eye className="h-4 w-4 text-slate-400" />
-                          查看详情
-                        </Link>
-                      </Gate>
-                      {isActive && (
-                        <>
-                          <Gate keys="finance.recharge">
-                            <Link
-                              href={`/finance?tab=recharge&student=${r.id}`}
-                              onClick={() => setActionMenuId(null)}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-amber-700 hover:bg-amber-50"
-                            >
-                              <Wallet className="h-4 w-4 text-amber-500" />
-                              充值
-                            </Link>
-                          </Gate>
-                          <Gate keys="students.graduate">
-                            <button
-                              onClick={() => {
-                                setActionMenuId(null);
-                                setGraduationTarget(r);
-                              }}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-blue-700 hover:bg-blue-50"
-                            >
-                              <GraduationCap className="h-4 w-4 text-blue-500" />
-                              毕业
-                            </button>
-                          </Gate>
-                          <Gate keys="students.delete">
-                            <button
-                              onClick={() => {
-                                setActionMenuId(null);
-                                requestStudentDelete(r);
-                              }}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                            >
-                              <Trash2 className="h-4 w-4 text-red-400" />
-                              删除
-                            </button>
-                          </Gate>
-                        </>
-                      )}
-                      {isGraduated && (
+                <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-0.5">
+                    <Gate keys="students.view">
+                      <Link href={`/students/${r.id}`} title="查看详情" className="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700">
+                        <Eye className="h-4 w-4" />
+                      </Link>
+                    </Gate>
+                    {isActive && (
+                      <>
+                        <Gate keys="finance.recharge">
+                          <Link href={`/finance?tab=recharge&student=${r.id}`} title="充值" className="grid h-8 w-8 place-items-center rounded-md text-amber-600 hover:bg-amber-50">
+                            <Wallet className="h-4 w-4" />
+                          </Link>
+                        </Gate>
                         <Gate keys="students.graduate">
-                          <button
-                            onClick={() => {
-                              setActionMenuId(null);
-                              setReactivationTarget(r);
-                            }}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-emerald-700 hover:bg-emerald-50"
-                          >
-                            <RotateCcw className="h-4 w-4 text-emerald-500" />
-                            恢复在读
+                          <button type="button" onClick={() => setGraduationTarget(r)} title="毕业" className="grid h-8 w-8 place-items-center rounded-md text-blue-600 hover:bg-blue-50">
+                            <GraduationCap className="h-4 w-4" />
                           </button>
                         </Gate>
-                      )}
-                    </div>
-                  )}
+                        <Gate keys="students.delete">
+                          <button type="button" onClick={() => requestStudentDelete(r)} title="删除" className="grid h-8 w-8 place-items-center rounded-md text-red-500 hover:bg-red-50">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </Gate>
+                      </>
+                    )}
+                    {isGraduated && (
+                      <Gate keys="students.graduate">
+                        <button type="button" onClick={() => setReactivationTarget(r)} title="恢复在读" className="grid h-8 w-8 place-items-center rounded-md text-emerald-600 hover:bg-emerald-50">
+                          <RotateCcw className="h-4 w-4" />
+                        </button>
+                      </Gate>
+                    )}
+                  </div>
                 </td>
               </tr>
               );
