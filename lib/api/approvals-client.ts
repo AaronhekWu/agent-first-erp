@@ -51,6 +51,17 @@ export async function requestApproval(input: ApprovalRequestInput) {
   return data;
 }
 
+/**
+ * 拉取所有「待审批」对象的 target_id (学员/报名/课程等), 供前端把相关操作按钮置灰,
+ * 防止多人对同一对象并发冲突操作。失败时返回空集 (不阻塞操作)。
+ */
+export async function getLockedTargets(): Promise<Set<string>> {
+  const sb = getSupabaseBrowser();
+  const { data, error } = await sb.rpc("rpc_get_locked_targets");
+  if (error || !Array.isArray(data)) return new Set();
+  return new Set(data as string[]);
+}
+
 export interface ReviewApprovalResult {
   ok: boolean;
   status: "approved" | "rejected" | "pending";

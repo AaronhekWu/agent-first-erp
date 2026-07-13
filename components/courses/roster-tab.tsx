@@ -1,10 +1,10 @@
 "use client";
 
 import { Fragment, useEffect, useState } from "react";
-import { LogOut, ArrowRightLeft, ChevronDown, ChevronUp } from "lucide-react";
+import { LogOut, ArrowRightLeft, ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency, maskPhone } from "@/lib/format";
-import { requestApproval } from "@/lib/api/approvals-client";
+import { requestApproval, getLockedTargets } from "@/lib/api/approvals-client";
 import { listActiveCourseOptions } from "@/lib/api/courses-client";
 import type { ActiveCourseOption, CourseEnrollment, CourseRow } from "@/lib/api/courses";
 
@@ -25,6 +25,12 @@ export function RosterTab({ enrollments, course, onMutate }: Props) {
   const [dropTarget, setDropTarget] = useState<CourseEnrollment | null>(null);
   const [transferTarget, setTransferTarget] = useState<CourseEnrollment | null>(null);
   const [pricingDetailId, setPricingDetailId] = useState<string | null>(null);
+  const [locked, setLocked] = useState<Set<string>>(new Set());
+
+  const refreshLocked = () => {
+    void getLockedTargets().then(setLocked);
+  };
+  useEffect(refreshLocked, [enrollments]);
 
   return (
     <div>
@@ -94,24 +100,33 @@ export function RosterTab({ enrollments, course, onMutate }: Props) {
                     {formatCurrency(e.balance)}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    {e.status === "enrolled" && (
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => setTransferTarget(e)}
-                          className="inline-flex h-7 items-center gap-1 rounded border border-slate-200 bg-white px-2 text-xs text-slate-600 hover:bg-slate-50"
+                    {e.status === "enrolled" &&
+                      (locked.has(e.enrollment_id) ? (
+                        <span
+                          title="该报名有待处理审批，已锁定以防冲突"
+                          className="inline-flex h-7 items-center gap-1 rounded bg-amber-50 px-2 text-xs text-amber-600 ring-1 ring-inset ring-amber-200"
                         >
-                          <ArrowRightLeft className="h-3 w-3" />
-                          转课
-                        </button>
-                        <button
-                          onClick={() => setDropTarget(e)}
-                          className="inline-flex h-7 items-center gap-1 rounded border border-red-100 bg-red-50 px-2 text-xs text-red-600 hover:bg-red-100"
-                        >
-                          <LogOut className="h-3 w-3" />
-                          退课
-                        </button>
-                      </div>
-                    )}
+                          <Lock className="h-3 w-3" />
+                          审批中
+                        </span>
+                      ) : (
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => setTransferTarget(e)}
+                            className="inline-flex h-7 items-center gap-1 rounded border border-slate-200 bg-white px-2 text-xs text-slate-600 hover:bg-slate-50"
+                          >
+                            <ArrowRightLeft className="h-3 w-3" />
+                            转课
+                          </button>
+                          <button
+                            onClick={() => setDropTarget(e)}
+                            className="inline-flex h-7 items-center gap-1 rounded border border-red-100 bg-red-50 px-2 text-xs text-red-600 hover:bg-red-100"
+                          >
+                            <LogOut className="h-3 w-3" />
+                            退课
+                          </button>
+                        </div>
+                      ))}
                   </td>
                 </tr>
                 {showPricing && (
@@ -143,6 +158,7 @@ export function RosterTab({ enrollments, course, onMutate }: Props) {
           onDone={async () => {
             setDropTarget(null);
             await onMutate();
+            refreshLocked();
           }}
         />
       )}
@@ -154,6 +170,7 @@ export function RosterTab({ enrollments, course, onMutate }: Props) {
           onDone={async () => {
             setTransferTarget(null);
             await onMutate();
+            refreshLocked();
           }}
         />
       )}
