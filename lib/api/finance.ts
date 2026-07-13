@@ -28,6 +28,7 @@ export interface Transaction {
   student_id?: string;
   student_name?: string;
   student_code?: string | null;
+  created_by_name?: string | null;
 }
 
 export interface FinanceKpis {
@@ -88,7 +89,7 @@ export async function listTransactions(opts: {
   if (opts.studentId) q = q.eq("fin_accounts.student_id", opts.studentId);
   const { data, error } = await q;
   if (error) throw error;
-  return ((data ?? []) as unknown as Array<
+  const rows = ((data ?? []) as unknown as Array<
     Transaction & {
       fin_accounts?: {
         student_id: string;
@@ -101,6 +102,18 @@ export async function listTransactions(opts: {
     student_name: r.fin_accounts?.stu_students?.name,
     student_code: r.fin_accounts?.stu_students?.student_code ?? null,
   }));
+
+  // 解析发起人姓名 (谁发起)
+  const creatorIds = [...new Set(rows.map((r) => r.created_by).filter((id): id is string => Boolean(id)))];
+  if (creatorIds.length > 0) {
+    const { data: profiles } = await sb
+      .from("acct_profiles")
+      .select("id, display_name")
+      .in("id", creatorIds);
+    const names = new Map((profiles ?? []).map((p) => [p.id as string, p.display_name as string]));
+    for (const r of rows) r.created_by_name = r.created_by ? names.get(r.created_by) ?? null : null;
+  }
+  return rows;
 }
 
 export async function getRechargeStudent(studentId?: string): Promise<StudentSearchResult | null> {

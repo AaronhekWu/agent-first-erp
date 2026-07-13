@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download, Eye, Search } from "lucide-react";
+import { Download, Eye, Search, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { Transaction, TxType } from "@/lib/api/finance";
 import { ListPagination } from "@/components/ui/list-pagination";
+import { Gate } from "@/lib/auth/permissions-context";
+import { requestApproval } from "@/lib/api/approvals-client";
 
 const TYPE_LABEL: Record<string, { label: string; cls: string }> = {
   recharge: { label: "充值", cls: "text-emerald-600" },
@@ -66,6 +68,27 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
   const resetPage = (fn: () => void) => {
     fn();
     setPage(1);
+  };
+
+  const requestTxnDelete = async (t: Transaction) => {
+    const label = TYPE_LABEL[t.type]?.label ?? t.type;
+    const reason = prompt(`请填写删除该流水（${label} ${formatCurrency(t.amount)}）的审批原因`);
+    if (reason === null) return;
+    if (!reason.trim()) return alert("审批原因必填");
+    try {
+      await requestApproval({
+        type: "finance_txn_delete",
+        title: `删除流水审批：${t.student_name ?? ""} ${label} ${formatCurrency(t.amount)}`,
+        reason: reason.trim(),
+        targetId: t.id,
+        targetLabel: t.student_name ?? t.description ?? "流水",
+        amount: t.amount,
+        payload: { p_txn_id: t.id },
+      });
+      alert("已提交删除流水审批。管理员通过后将反转账户余额并删除该记录。");
+    } catch (e) {
+      alert((e as Error).message);
+    }
   };
 
   const exportCsv = () => {
@@ -193,9 +216,27 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
                     {isOpen && (
                       <tr>
                         <td colSpan={7} className="bg-slate-50 px-4 py-3">
-                          <pre className="max-h-56 overflow-auto rounded bg-slate-900 p-3 text-xs leading-5 text-slate-100">
-                            {JSON.stringify({ reference_type: t.reference_type, reference_id: t.reference_id, metadata: t.metadata }, null, 2)}
-                          </pre>
+                          <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+                            <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+                              <Info label="发起人" value={t.created_by_name ?? "系统"} />
+                              <Info label="发起时间" value={formatDate(t.created_at, true)} />
+                              <Info label="学员" value={`${t.student_name ?? "未知学员"}${t.student_code ? ` (${t.student_code})` : ""}`} />
+                              <Info label="关联" value={t.reference_type ? `${t.reference_type}${t.reference_id ? ` · ${t.reference_id}` : ""}` : "无"} />
+                              <Info label="余额变化" value={`${formatCurrency(t.balance_before)} → ${formatCurrency(t.balance_after)}`} />
+                              <Info label="说明" value={t.description ?? "无备注"} />
+                            </dl>
+                            <div className="flex items-start justify-end">
+                              <Gate keys="finance.refund">
+                                <button
+                                  onClick={() => requestTxnDelete(t)}
+                                  className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 px-3 text-xs font-medium text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  删除流水（提交审批）
+                                </button>
+                              </Gate>
+                            </div>
+                          </div>
                         </td>
                       </tr>
                     )}
@@ -216,6 +257,15 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
           }}
         />
       </div>
+    </div>
+  );
+}
+
+function Info({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex gap-1">
+      <dt className="shrink-0 text-slate-400">{label}：</dt>
+      <dd className="min-w-0 truncate text-slate-700">{value}</dd>
     </div>
   );
 }

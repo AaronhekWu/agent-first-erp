@@ -9,6 +9,7 @@ export type ApprovalType =
   | "enrollment_drop"
   | "enrollment_transfer"
   | "finance_refund"
+  | "finance_txn_delete"
   | "department_delete"
   | "staff_deactivate";
 
