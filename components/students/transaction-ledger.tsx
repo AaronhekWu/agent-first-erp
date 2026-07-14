@@ -42,6 +42,12 @@ const QUICK_FILTERS: Array<{ key: string; label: string }> = [
   { key: "refund", label: "退费" },
 ];
 
+function localDay(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 export function TransactionLedger({ transactions }: { transactions: LedgerTransaction[] }) {
   const [type, setType] = useState("");
   const [from, setFrom] = useState("");
@@ -50,7 +56,8 @@ export function TransactionLedger({ transactions }: { transactions: LedgerTransa
   const filtered = useMemo(() => {
     return transactions.filter((t) => {
       if (type && t.type !== type) return false;
-      const day = t.created_at.slice(0, 10);
+      // 按本地日期比较 (显示也是本地时间); 直接截 ISO 串会用 UTC 日期, 东八区晚间记录会错归前一天
+      const day = localDay(t.created_at);
       if (from && day < from) return false;
       if (to && day > to) return false;
       return true;
