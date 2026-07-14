@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Archive, BookOpen, Users, Wallet, CheckCircle } from "lucide-react";
+import { Archive, BadgePercent, BookOpen, Users, Wallet, CheckCircle } from "lucide-react";
 import { listCourses } from "@/lib/api/courses";
 import { getLookups } from "@/lib/api/lookups";
 import { NewCourseButton } from "@/components/courses/new-course-button";
@@ -39,6 +39,15 @@ export default async function CoursesPage({ searchParams }: PageProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Gate keys="courses.pricing">
+            <Link
+              href="/courses/campaigns"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-600 hover:bg-slate-50"
+            >
+              <BadgePercent className="h-4 w-4" />
+              优惠组合管理
+            </Link>
+          </Gate>
           <Link
             href={showArchived ? "/courses" : "/courses?archived=1"}
             className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-600 hover:bg-slate-50"
