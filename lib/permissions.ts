@@ -44,8 +44,9 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
     "courses.view", "courses.enroll", "finance.view", "finance.recharge",
     "followups.view", "followups.create",
   ],
+  // 教师入职默认只读; 点名等写权限须主管在成员编辑里显式勾选授权 (与后端 has_permission 一致)
   teacher: [
-    "students.view", "courses.view", "courses.attendance", "followups.view",
+    "students.view", "courses.view", "followups.view",
   ],
   viewer: PERMISSION_CATALOG
     .filter((p) => p.key.endsWith(".view"))

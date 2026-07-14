@@ -18,6 +18,9 @@ export default async function RootLayout({
   const me = await getMe();
   // 已登录但 停用 / 未分配角色 → 待审批页 (DB 层已无数据访问权)
   const blocked = !!me && (!me.isActive || !me.user.primary_role);
+  // 已分配角色但主管尚未配置权限 → 只读态 (仅角色默认查看权限)
+  const readonlyPending =
+    !!me && !blocked && me.user.primary_role !== "admin" && !me.configured;
 
   return (
     <html lang="zh-CN">
@@ -29,7 +32,14 @@ export default async function RootLayout({
               reason={!me!.isActive ? "inactive" : "norole"}
             />
           ) : (
-            <AppShell>{children}</AppShell>
+            <AppShell>
+              {readonlyPending && (
+                <div className="border-b border-amber-200 bg-amber-50 px-6 py-2.5 text-sm text-amber-800">
+                  当前账号权限待主管配置，暂为只读模式：可查看数据，暂不能新增 / 编辑 / 删除。请联系主管在「校区管理 · 成员」中完成授权。
+                </div>
+              )}
+              {children}
+            </AppShell>
           )}
         </PermissionsProvider>
       </body>

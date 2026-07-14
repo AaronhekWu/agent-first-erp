@@ -9,6 +9,8 @@ export interface MeResult {
   isActive: boolean;
   /** 是否已分配角色 (无角色 → 待管理员分配, 无任何数据访问) */
   hasRole: boolean;
+  /** 是否已由主管显式配置权限 (false → 仅角色默认只读, 待授权) */
+  configured: boolean;
 }
 
 interface RpcMe {
@@ -48,5 +50,6 @@ export async function getMe(): Promise<MeResult | null> {
     permissions: explicit.length > 0 ? explicit : undefined,
     isActive: me.is_active !== false,
     hasRole: !!me.role,
+    configured: explicit.length > 0,
   };
 }
