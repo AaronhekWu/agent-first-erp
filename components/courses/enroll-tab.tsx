@@ -20,7 +20,7 @@ interface Props {
   onMutate: () => Promise<void>;
 }
 
-type EnrollmentMode = "normal" | "campaign" | "referral" | "custom";
+type EnrollmentMode = "normal" | "campaign" | "custom";
 
 export function EnrollTab({ course, enrollments, onMutate }: Props) {
   const { has } = usePermissions();
@@ -36,9 +36,6 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
   const [customType, setCustomType] = useState("fixed");
   const [customValue, setCustomValue] = useState("");
   const [discountReason, setDiscountReason] = useState("");
-  const [referrerKeyword, setReferrerKeyword] = useState("");
-  const [referrerResults, setReferrerResults] = useState<StudentSearchResult[]>([]);
-  const [referrer, setReferrer] = useState<StudentSearchResult | null>(null);
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -71,23 +68,7 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
     return () => { cancelled = true; clearTimeout(timer); };
   }, [keyword]);
 
-  useEffect(() => {
-    if (mode !== "referral" || !referrerKeyword.trim() || referrer) {
-      setReferrerResults([]);
-      return;
-    }
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      void searchStudents(referrerKeyword.trim(), 8)
-        .then((rows) => !cancelled && setReferrerResults(rows))
-        .catch((e) => !cancelled && setError((e as Error).message));
-    }, 250);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [mode, referrerKeyword, referrer]);
-
-  const availableCampaigns = campaigns.filter((campaign) =>
-    mode === "referral" ? campaign.type === "referral" : campaign.type !== "referral",
-  );
+  const availableCampaigns = campaigns;
   const selectedPlan = plans.find((plan) => plan.id === priceId);
   const selectedCampaign = campaigns.find((campaign) => campaign.id === campaignId);
   const quote = useMemo(() => {
@@ -102,7 +83,7 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
     const gross = useOverride ? Math.round(perLesson * override * 100) / 100 : resolvedGross;
     const discountType = mode === "custom" ? customType : selectedCampaign?.discount_type;
     const discountValue = mode === "custom" ? Number(customValue || 0) : Number(selectedCampaign?.discount_value ?? 0);
-    const giftLessons = mode === "campaign" || mode === "referral" ? Number(selectedCampaign?.gift_lessons ?? 0) : 0;
+    const giftLessons = mode === "campaign" ? Number(selectedCampaign?.gift_lessons ?? 0) : 0;
     let discount = 0;
     if (discountType === "percentage" || discountType === "percent") discount = gross * discountValue / 100;
     if (discountType === "fixed" || discountType === "amount") discount = discountValue;
@@ -115,26 +96,16 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
   const chooseMode = (nextMode: EnrollmentMode) => {
     setMode(nextMode);
     setCampaignId("");
-    setReferrer(null);
-    setReferrerKeyword("");
     setError(null);
   };
 
   const handleEnroll = async (student: StudentSearchResult) => {
-    if ((mode === "campaign" || mode === "referral") && !campaignId) {
-      setError("请选择有效的优惠活动");
-      return;
-    }
-    if (mode === "referral" && !referrer) {
-      setError("请选择推荐本次报名的老学员");
+    if (mode === "campaign" && !campaignId) {
+      setError("请选择有效的优惠组合");
       return;
     }
     if (mode === "custom" && (!(Number(customValue) > 0) || !discountReason.trim())) {
       setError("请填写有效的优惠数值和优惠原因");
-      return;
-    }
-    if (referrer?.id === student.id) {
-      setError("报名学员不能同时作为自己的推荐人");
       return;
     }
     setBusyId(student.id);
@@ -146,11 +117,11 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
         p_course_id: course.course_id,
         p_source: mode,
         p_price_id: priceId || null,
-        p_campaign_id: mode === "campaign" || mode === "referral" ? campaignId : null,
+        p_campaign_id: mode === "campaign" ? campaignId : null,
         p_custom_discount_type: mode === "custom" ? customType : null,
         p_custom_discount_value: mode === "custom" ? Number(customValue) : null,
         p_discount_reason: mode === "custom" ? discountReason.trim() : null,
-        p_referrer_student_id: mode === "referral" ? referrer?.id ?? null : null,
+        p_referrer_student_id: null,
         p_lessons_override: lessonsOverride.trim() !== "" && Number(lessonsOverride) > 0 ? Number(lessonsOverride) : null,
         p_notes: notes.trim() || null,
       });
@@ -178,8 +149,8 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
           </label>
           <div>
             <div className="text-xs font-medium text-slate-600">报名方式</div>
-            <div className="mt-1 grid h-10 grid-cols-4 rounded-md border border-slate-200 bg-white p-0.5 text-xs">
-              {([['normal', '正常'], ['campaign', '活动'], ['referral', '老带新'], ...(has("courses.pricing") ? [['custom', '自定义'] as const] : [])] as const).map(([value, label]) => (
+            <div className="mt-1 grid h-10 grid-cols-3 rounded-md border border-slate-200 bg-white p-0.5 text-xs">
+              {([['normal', '正常'], ['campaign', '优惠组合'], ...(has("courses.pricing") ? [['custom', '自定义'] as const] : [])] as const).map(([value, label]) => (
                 <button key={value} type="button" onClick={() => chooseMode(value)} className={mode === value ? "rounded bg-brand-600 font-medium text-white" : "rounded text-slate-600 hover:bg-slate-50"}>{label}</button>
               ))}
             </div>
@@ -202,23 +173,16 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
           </label>
         </div>
 
-        {(mode === "campaign" || mode === "referral") && (
+        {mode === "campaign" && (
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <label className="text-xs font-medium text-slate-600">
-              优惠活动
+              优惠组合
               <select value={campaignId} onChange={(e) => setCampaignId(e.target.value)} className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm focus:border-brand-500 focus:outline-none">
-                <option value="">请选择活动</option>
+                <option value="">请选择优惠组合</option>
                 {availableCampaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}
               </select>
-              {availableCampaigns.length === 0 && <span className="mt-1 block text-amber-600">当前没有适用于本课程的有效活动</span>}
+              {availableCampaigns.length === 0 && <span className="mt-1 block text-amber-600">当前没有适用于本课程的有效优惠组合，请先到「优惠组合管理」创建</span>}
             </label>
-            {mode === "referral" && (
-              <div className="relative text-xs font-medium text-slate-600">
-                推荐老学员
-                <input value={referrer ? `${referrer.name} · ${referrer.student_code ?? "无编号"}` : referrerKeyword} onChange={(e) => { setReferrer(null); setReferrerKeyword(e.target.value); }} placeholder="搜索姓名 / 手机号 / 学员编号" className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm font-normal focus:border-brand-500 focus:outline-none" />
-                {referrerResults.length > 0 && <div className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow-lg">{referrerResults.map((student) => <button key={student.id} type="button" onClick={() => { setReferrer(student); setReferrerKeyword(""); }} className="flex w-full justify-between px-3 py-2 text-left text-sm font-normal hover:bg-slate-50"><span>{student.name}</span><span className="text-slate-400">{student.student_code ?? maskPhone(student.phone)}</span></button>)}</div>}
-              </div>
-            )}
           </div>
         )}
 
