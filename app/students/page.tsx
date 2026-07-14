@@ -57,9 +57,9 @@ export default async function StudentsPage({ searchParams }: PageProps) {
     <div className="space-y-5 p-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">学员查询</h1>
+          <h1 className="text-2xl font-semibold text-slate-900">学员管理</h1>
           <p className="mt-1 text-sm text-slate-500">
-            面向后台列表场景：先筛选，再查看，再进入详情
+            增加（右上角新增学员）· 查询（下方筛选）· 删除/操作（列表每行按钮）
           </p>
         </div>
         <Gate keys="students.create">

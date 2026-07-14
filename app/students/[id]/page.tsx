@@ -6,6 +6,7 @@ import { getStudentSignals } from "@/lib/api/signals";
 import { StatusBadge } from "@/components/students/status-badge";
 import { MonthCalendar } from "@/components/students/month-calendar";
 import { StudentSignalsCard } from "@/components/students/student-signals";
+import { TransactionLedger } from "@/components/students/transaction-ledger";
 import {
   formatCurrency,
   formatDate,
@@ -19,26 +20,6 @@ interface Props {
   params: { id: string };
 }
 
-const TX_TYPE_LABEL: Record<string, string> = {
-  recharge: "充值",
-  consume: "消费",
-  refund: "退费",
-  transfer_in: "转入",
-  transfer_out: "转出",
-  gift: "赠送",
-  adjustment: "调整",
-};
-
-const TX_TYPE_CLS: Record<string, string> = {
-  recharge: "text-emerald-600",
-  consume: "text-red-500",
-  refund: "text-amber-600",
-  transfer_in: "text-emerald-600",
-  transfer_out: "text-slate-600",
-  gift: "text-violet-600",
-  adjustment: "text-slate-600",
-};
-
 export default async function StudentDetailPage({ params }: Props) {
   const [detail, signals] = await Promise.all([
     getStudentDetail(params.id),
@@ -48,6 +29,19 @@ export default async function StudentDetailPage({ params }: Props) {
 
   const s = detail.student;
   const a = detail.account;
+
+  // 课时汇总: 跨所有报名聚合
+  const lessons = detail.enrollments.reduce(
+    (acc, e) => {
+      const total = Number(e.total_lessons ?? 0);
+      const used = Number(e.used_lessons ?? 0);
+      acc.total += total;
+      acc.used += used;
+      acc.remaining += Math.max(0, total - used);
+      return acc;
+    },
+    { total: 0, used: 0, remaining: 0 },
+  );
 
   return (
     <div className="space-y-5 p-6">
@@ -119,11 +113,11 @@ export default async function StudentDetailPage({ params }: Props) {
         <MonthCalendar studentId={s.id} />
       </div>
 
-      {/* 财务摘要 */}
+      {/* 金额汇总 */}
       <div className="rounded-2xl bg-white p-5 shadow-card">
         <div className="mb-4 flex items-center gap-2 text-sm font-medium text-slate-700">
           <Wallet className="h-4 w-4 text-amber-500" />
-          财务摘要
+          金额汇总
         </div>
         <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-5">
           <KvBox label="当前余额" value={formatCurrency(a?.balance ?? 0)} accent="amber" />
@@ -131,6 +125,19 @@ export default async function StudentDetailPage({ params }: Props) {
           <KvBox label="累计消费" value={formatCurrency(a?.total_consumed ?? 0)} />
           <KvBox label="累计退款" value={formatCurrency(a?.total_refunded ?? 0)} />
           <KvBox label="冻结金额" value={formatCurrency(a?.frozen_amount ?? 0)} />
+        </div>
+      </div>
+
+      {/* 课时汇总 */}
+      <div className="rounded-2xl bg-white p-5 shadow-card">
+        <div className="mb-4 flex items-center gap-2 text-sm font-medium text-slate-700">
+          <BookOpen className="h-4 w-4 text-brand-500" />
+          课时汇总
+        </div>
+        <div className="grid grid-cols-3 gap-3 text-sm">
+          <KvBox label="累计报名课时" value={`${lessons.total} 节`} />
+          <KvBox label="已消课时" value={`${lessons.used} 节`} />
+          <KvBox label="剩余课时" value={`${lessons.remaining} 节`} accent="amber" />
         </div>
       </div>
 
@@ -199,52 +206,8 @@ export default async function StudentDetailPage({ params }: Props) {
         </Card>
       </div>
 
-      {/* 交易流水 */}
-      <Card title={`交易流水 (${detail.transactions.length})`}>
-        {detail.transactions.length === 0 ? (
-          <EmptyHint text="暂无交易流水" />
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-xs text-slate-500">
-              <tr>
-                <th className="px-3 py-2 text-left">时间</th>
-                <th className="px-3 py-2 text-left">类型</th>
-                <th className="px-3 py-2 text-left">说明</th>
-                <th className="px-3 py-2 text-right">金额</th>
-                <th className="px-3 py-2 text-right">余额（前 → 后）</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {detail.transactions.map((t) => (
-                <tr key={t.id}>
-                  <td className="px-3 py-2 text-slate-600">
-                    {formatDate(t.created_at, true)}
-                  </td>
-                  <td className="px-3 py-2">
-                    <span
-                      className={`text-sm font-medium ${TX_TYPE_CLS[t.type] ?? "text-slate-700"}`}
-                    >
-                      {TX_TYPE_LABEL[t.type] ?? t.type}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-slate-600">{t.description ?? "无备注"}</td>
-                  <td
-                    className={`px-3 py-2 text-right tabular-nums ${TX_TYPE_CLS[t.type] ?? "text-slate-700"}`}
-                  >
-                    {formatCurrency(t.amount)}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-500">
-                    {formatCurrency(t.balance_before)} →{" "}
-                    <span className="text-slate-800">
-                      {formatCurrency(t.balance_after)}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </Card>
+      {/* 交易台账（按类型/日期定位消课·充值·退费） */}
+      <TransactionLedger transactions={detail.transactions} />
     </div>
   );
 }
