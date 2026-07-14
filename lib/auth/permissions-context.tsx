@@ -1,7 +1,10 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import { PERMISSION_CATALOG, ROLE_DEFAULTS } from "@/lib/permissions";
+import { PERMISSION_CATALOG, ROLE_DEFAULTS, ROLE_LABELS } from "@/lib/permissions";
+
+// 兼容旧客户端导入路径; 服务端组件请直接从 "@/lib/permissions" 导入
+export { ROLE_LABELS };
 
 /**
  * 权限模型:
@@ -17,13 +20,6 @@ export interface CurrentUser {
   primary_role: string | null;
   email?: string | null;
 }
-
-export const ROLE_LABELS: Record<string, string> = {
-  admin: "系统管理员",
-  counselor: "课程顾问",
-  teacher: "教师",
-  viewer: "只读用户",
-};
 
 interface PermissionsCtx {
   user: CurrentUser;

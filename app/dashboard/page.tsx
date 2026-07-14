@@ -12,7 +12,7 @@ import {
 import { getMe } from "@/lib/auth/me";
 import { getDashboard } from "@/lib/api/dashboard";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { ROLE_LABELS } from "@/lib/auth/permissions-context";
+import { ROLE_LABELS } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 

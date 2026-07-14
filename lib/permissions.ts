@@ -37,6 +37,14 @@ export const PERMISSION_CATALOG: PermissionItem[] = [
   { key: "settings.manage",  label: "系统设置", group: "校区" },
 ];
 
+// 角色显示名 — 放在本文件(无 "use client")以便服务端组件安全导入值对象
+export const ROLE_LABELS: Record<string, string> = {
+  admin: "系统管理员",
+  counselor: "课程顾问",
+  teacher: "教师",
+  viewer: "只读用户",
+};
+
 export const ROLE_DEFAULTS: Record<string, string[]> = {
   admin: PERMISSION_CATALOG.map((p) => p.key),
   counselor: [
