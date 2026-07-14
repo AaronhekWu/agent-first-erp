@@ -31,6 +31,7 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
   const [campaigns, setCampaigns] = useState<EnrollmentCampaign[]>([]);
   const [mode, setMode] = useState<EnrollmentMode>("normal");
   const [priceId, setPriceId] = useState("");
+  const [lessonsOverride, setLessonsOverride] = useState("");
   const [campaignId, setCampaignId] = useState("");
   const [customType, setCustomType] = useState("fixed");
   const [customValue, setCustomValue] = useState("");
@@ -90,9 +91,15 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
   const selectedPlan = plans.find((plan) => plan.id === priceId);
   const selectedCampaign = campaigns.find((campaign) => campaign.id === campaignId);
   const quote = useMemo(() => {
-    const baseLessons = Number(selectedPlan?.total_lessons ?? course.total_lessons ?? 0);
+    const resolvedLessons = Number(selectedPlan?.total_lessons ?? course.total_lessons ?? 0);
     const listUnit = Number(selectedPlan?.unit_price ?? course.fee ?? 0);
-    const gross = Number(selectedPlan?.total_price ?? listUnit * baseLessons);
+    const resolvedGross = Number(selectedPlan?.total_price ?? listUnit * resolvedLessons);
+    // 报名课时覆盖: 保持每节单价不变, 按指定课时缩放原价 (与 rpc_enroll_student_v2 一致)
+    const override = Number(lessonsOverride);
+    const useOverride = lessonsOverride.trim() !== "" && override > 0;
+    const perLesson = resolvedLessons > 0 ? resolvedGross / resolvedLessons : listUnit;
+    const baseLessons = useOverride ? override : resolvedLessons;
+    const gross = useOverride ? Math.round(perLesson * override * 100) / 100 : resolvedGross;
     const discountType = mode === "custom" ? customType : selectedCampaign?.discount_type;
     const discountValue = mode === "custom" ? Number(customValue || 0) : Number(selectedCampaign?.discount_value ?? 0);
     const giftLessons = mode === "campaign" || mode === "referral" ? Number(selectedCampaign?.gift_lessons ?? 0) : 0;
@@ -103,7 +110,7 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
     const net = Math.max(0, gross - discount);
     const totalLessons = baseLessons + giftLessons;
     return { listUnit, gross, discount, net, totalLessons, effectiveUnit: totalLessons > 0 ? net / totalLessons : 0, giftLessons };
-  }, [course.fee, course.total_lessons, customType, customValue, mode, selectedCampaign, selectedPlan]);
+  }, [course.fee, course.total_lessons, customType, customValue, lessonsOverride, mode, selectedCampaign, selectedPlan]);
 
   const chooseMode = (nextMode: EnrollmentMode) => {
     setMode(nextMode);
@@ -144,6 +151,7 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
         p_custom_discount_value: mode === "custom" ? Number(customValue) : null,
         p_discount_reason: mode === "custom" ? discountReason.trim() : null,
         p_referrer_student_id: mode === "referral" ? referrer?.id ?? null : null,
+        p_lessons_override: lessonsOverride.trim() !== "" && Number(lessonsOverride) > 0 ? Number(lessonsOverride) : null,
         p_notes: notes.trim() || null,
       });
       setInfo(`已为 ${student.name} 报课，应收 ${formatCurrency(quote.net)}，按实际上课逐节扣费`);
@@ -176,6 +184,22 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
               ))}
             </div>
           </div>
+        </div>
+
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <label className="text-xs font-medium text-slate-600">
+            报名课时
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={lessonsOverride}
+              onChange={(e) => setLessonsOverride(e.target.value)}
+              placeholder={`默认 ${selectedPlan?.total_lessons ?? course.total_lessons ?? "按方案"} 节，可自定义`}
+              className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm font-normal focus:border-brand-500 focus:outline-none"
+            />
+            <span className="mt-1 block font-normal text-slate-400">留空按价格方案课时；填写后保持每节单价不变，按节数重新计价</span>
+          </label>
         </div>
 
         {(mode === "campaign" || mode === "referral") && (

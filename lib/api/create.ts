@@ -155,6 +155,7 @@ export interface EnrollStudentInput {
   p_custom_discount_value?: number | null;
   p_discount_reason?: string | null;
   p_referrer_student_id?: string | null;
+  p_lessons_override?: number | null;
 }
 export function enrollStudent(input: EnrollStudentInput) {
   return callRpc("rpc_enroll_student_v2", { ...input });
