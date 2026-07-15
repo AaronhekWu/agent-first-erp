@@ -35,7 +35,8 @@ export async function getLookups(): Promise<Lookups> {
   const v = (data ?? {}) as Partial<Lookups>;
   return {
     counselors: v.counselors ?? [],
-    departments: v.departments ?? [],
+    // 顶层(根)部门是公司主体, 不作为学员/课程的归属选项展示
+    departments: (v.departments ?? []).filter((d) => d.parent_id !== null),
     roles: v.roles ?? [],
     schools: v.schools ?? [],
     grades: v.grades ?? [],

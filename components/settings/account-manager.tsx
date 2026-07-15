@@ -16,6 +16,7 @@ interface CurrentAccount {
   phone: string | null;
   email: string | null;
   primary_role: string | null;
+  department_id: string | null;
 }
 
 export function AccountManager({ current }: { current: CurrentAccount | null }) {
@@ -46,7 +47,8 @@ export function AccountManager({ current }: { current: CurrentAccount | null }) 
         p_phone: phone || null,
         p_email: email.trim() || null,
         p_primary_role: current.primary_role ?? null,
-        p_department_id: null,
+        // 透传现有部门与权限 (缺省), 避免自助改资料时清空
+        p_department_id: current.department_id,
         p_permissions: undefined,
       });
       setProfileMsg("已保存");

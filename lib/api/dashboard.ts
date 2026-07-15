@@ -34,8 +34,21 @@ export interface TeacherClass {
   pending_sessions: number;
 }
 
+export interface DailyFlow {
+  day: string; // YYYY-MM-DD (本地)
+  recharge: number;
+  consume: number;
+}
+
 export type DashboardData =
-  | { role: "admin"; summary: DashSummary | null; pendingApprovals: number; approvalQueue: ApprovalBrief[] }
+  | {
+      role: "admin";
+      summary: DashSummary | null;
+      pendingApprovals: number;
+      approvalQueue: ApprovalBrief[];
+      daily: DailyFlow[];
+      graduated: number;
+    }
   | { role: "counselor"; myStudents: number; pendingFollowups: number; lowBalanceCount: number; lowBalance: LowBalance[] }
   | { role: "teacher"; myClasses: number; classes: TeacherClass[] }
   | { role: "generic" };
@@ -44,7 +57,10 @@ export async function getDashboard(role: string | null): Promise<DashboardData> 
   const sb = createServerSupabase();
 
   if (role === "admin") {
-    const [summaryRes, apprRes] = await Promise.all([
+    const since = new Date();
+    since.setDate(since.getDate() - 29);
+    since.setHours(0, 0, 0, 0);
+    const [summaryRes, apprRes, txRes, gradRes] = await Promise.all([
       sb.rpc("rpc_get_dashboard_summary"),
       sb
         .from("aud_approvals")
@@ -52,12 +68,41 @@ export async function getDashboard(role: string | null): Promise<DashboardData> 
         .eq("status", "pending")
         .order("created_at", { ascending: false })
         .limit(8),
+      sb
+        .from("fin_transactions")
+        .select("type,amount,created_at")
+        .in("type", ["recharge", "consume"])
+        .gte("created_at", since.toISOString())
+        .limit(10000),
+      sb
+        .from("stu_students")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "graduated")
+        .is("deleted_at", null),
     ]);
+
+    // 逐日充值/消课 (本地日期), 补齐无交易的空白天
+    const byDay = new Map<string, DailyFlow>();
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(since);
+      d.setDate(since.getDate() + i);
+      const key = localDay(d);
+      byDay.set(key, { day: key, recharge: 0, consume: 0 });
+    }
+    for (const t of (txRes.data ?? []) as { type: string; amount: number; created_at: string }[]) {
+      const row = byDay.get(localDay(new Date(t.created_at)));
+      if (!row) continue;
+      if (t.type === "recharge") row.recharge += Number(t.amount);
+      else row.consume += Number(t.amount);
+    }
+
     return {
       role: "admin",
       summary: (summaryRes.data as DashSummary | null) ?? null,
       pendingApprovals: apprRes.count ?? 0,
       approvalQueue: (apprRes.data ?? []) as ApprovalBrief[],
+      daily: [...byDay.values()],
+      graduated: gradRes.count ?? 0,
     };
   }
 
@@ -124,4 +169,9 @@ export async function getDashboard(role: string | null): Promise<DashboardData> 
   }
 
   return { role: "generic" };
+}
+
+function localDay(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }

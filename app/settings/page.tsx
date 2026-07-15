@@ -29,6 +29,7 @@ export default async function SettingsPage() {
         phone: staffRow?.phone ?? null,
         email: staffRow?.email ?? me!.user.email ?? null,
         primary_role: me!.user.primary_role,
+        department_id: staffRow?.department_id ?? null,
       }
     : null;
 

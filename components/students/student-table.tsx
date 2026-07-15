@@ -263,6 +263,8 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
                     "px-3 py-3 font-medium whitespace-nowrap",
                     c.w,
                     c.align ?? "text-left",
+                    // 操作列固定右侧, 与其他表头同层级
+                    c.key === "action" && "sticky right-0 z-10 border-l border-slate-100 bg-slate-50",
                   )}
                 >
                   {c.label}
@@ -289,7 +291,7 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
               <tr
                 key={r.id}
                 className={cn(
-                  "cursor-pointer hover:bg-slate-50",
+                  "group cursor-pointer hover:bg-slate-50",
                   isChecked && "bg-brand-50/50",
                 )}
                 onClick={() => setActive(r)}
@@ -357,7 +359,14 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
                     </div>
                   </div>
                 </td>
-                <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                <td
+                  className={cn(
+                    "sticky right-0 z-10 border-l border-slate-100 px-3 py-3",
+                    // sticky 需不透明背景, 跟随行的选中/悬停态
+                    isChecked ? "bg-brand-50" : "bg-white group-hover:bg-slate-50",
+                  )}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <div className="flex items-center gap-0.5">
                     <Gate keys="students.view">
                       <Link href={`/students/${r.id}`} title="查看详情" className="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700">

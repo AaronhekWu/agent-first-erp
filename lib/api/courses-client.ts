@@ -99,7 +99,7 @@ export async function searchStudents(keyword: string, limit = 10): Promise<Stude
   const kw = `%${keyword}%`;
   const { data, error } = await sb
     .from("v_student_overview")
-    .select("id, name, student_code, phone, status")
+    .select("id, name, student_code, phone, status, balance")
     .eq("status", "active")
     .or(`name.ilike.${kw},phone.ilike.${kw},student_code.ilike.${kw}`)
     .limit(limit);

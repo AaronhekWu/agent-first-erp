@@ -202,7 +202,7 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
           <QuoteItem label="应收 / 实际课时单价" value={`${formatCurrency(quote.net)} / ${formatCurrency(quote.effectiveUnit)}`} strong />
         </div>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="报名备注（可选）" className="mt-3 min-h-14 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
-        <div className="mt-2 flex items-center gap-1 text-xs text-slate-500"><BadgePercent className="h-3.5 w-3.5" />报名仅锁定合同价格；余额将在实际到课时逐节扣除，余额不足会阻止消课。</div>
+        <div className="mt-2 flex items-center gap-1 text-xs text-slate-500"><BadgePercent className="h-3.5 w-3.5" />报名仅锁定合同价格；余额将在实际到课时逐节扣除。余额为正可消课（本次可扣成负数），欠费后须先充值才能继续消课。</div>
         {error && <div className="mt-2 rounded bg-red-50 px-3 py-1.5 text-xs text-red-600">{error}</div>}
         {info && <div className="mt-2 rounded bg-emerald-50 px-3 py-1.5 text-xs text-emerald-700">{info}</div>}
       </div>

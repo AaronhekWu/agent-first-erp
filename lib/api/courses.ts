@@ -21,6 +21,8 @@ export interface CourseRow {
   completed_sessions: number;
   total_lessons: number | null;
   is_archived: boolean;
+  /** 在读报名的剩余课时合计 (可结课判定用) */
+  enrolled_remaining_lessons: number;
   total_revenue: number;
   start_date: string | null;
   end_date: string | null;
@@ -88,6 +90,7 @@ export interface StudentSearchResult {
   student_code: string | null;
   phone: string | null;
   status: string;
+  balance?: number | null;
 }
 
 // ---------- 服务端 ----------

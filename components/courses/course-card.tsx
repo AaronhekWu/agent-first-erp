@@ -8,7 +8,7 @@ import { requestApproval } from "@/lib/api/approvals-client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { CourseManageModal } from "./course-manage-modal";
 import type { CourseRow } from "@/lib/api/courses";
-import { getCourseLifecycle, lessonProgress, type CourseLifecycle } from "@/lib/course-lifecycle";
+import { canCompleteCourse, getCourseLifecycle, lessonProgress, type CourseLifecycle } from "@/lib/course-lifecycle";
 import { setCompletedCourseArchived } from "@/lib/api/courses-client";
 
 const STATUS: Record<CourseLifecycle, { label: string; cls: string; ring: string }> = {
@@ -150,15 +150,21 @@ export function CourseCard({ course, initialOpen = false }: { course: CourseRow;
             </button>
           ) : (
             <>
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() => submitCourseApproval("archive")}
-                className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 px-2.5 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-40"
-              >
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                {busy === "archive" ? "提交中" : "结课"}
-              </button>
+              {(() => {
+                const completable = canCompleteCourse(course);
+                return (
+                  <button
+                    type="button"
+                    disabled={busy !== null || !completable.ok}
+                    title={completable.reason ?? undefined}
+                    onClick={() => submitCourseApproval("archive")}
+                    className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 px-2.5 text-xs text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {busy === "archive" ? "提交中" : "结课"}
+                  </button>
+                );
+              })()}
               <button
                 type="button"
                 disabled={busy !== null}
