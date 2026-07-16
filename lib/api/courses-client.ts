@@ -65,20 +65,28 @@ export async function listActiveCourseOptions(excludeId?: string): Promise<Activ
   return (data ?? []) as ActiveCourseOption[];
 }
 
-export async function updateCoursePlan(input: {
+export async function updateCourseInfo(input: {
   courseId: string;
   totalLessons: number;
   unitPrice: number;
   startDate: string;
   endDate: string;
+  departmentId: string | null;
+  weekdays: string[];
+  time: string;
+  teacherName: string;
 }) {
   const sb = getSupabaseBrowser();
-  const { data, error } = await sb.rpc("rpc_update_course_plan_v2", {
+  const { data, error } = await sb.rpc("rpc_update_course_info", {
     p_course_id: input.courseId,
     p_total_lessons: input.totalLessons,
     p_unit_price: input.unitPrice,
     p_start_date: input.startDate,
     p_end_date: input.endDate,
+    p_department_id: input.departmentId,
+    p_weekdays: input.weekdays,
+    p_class_time: input.time,
+    p_teacher_name: input.teacherName,
   });
   if (error) throw new Error(error.message);
   return data;

@@ -13,7 +13,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const PAGE_SIZE_OPTIONS = [15, 30, 45, 60, 75, 90];
+const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
 interface PageProps {
   searchParams: {
@@ -32,8 +32,8 @@ interface PageProps {
 
 export default async function StudentsPage({ searchParams }: PageProps) {
   const page = Math.max(1, Number(searchParams.page ?? "1") || 1);
-  const requestedPageSize = Number(searchParams.pageSize ?? "15");
-  const pageSize = PAGE_SIZE_OPTIONS.includes(requestedPageSize) ? requestedPageSize : 15;
+  const requestedPageSize = Number(searchParams.pageSize ?? "20");
+  const pageSize = PAGE_SIZE_OPTIONS.includes(requestedPageSize) ? requestedPageSize : 20;
 
   const filters: F = {
     keyword: searchParams.q,

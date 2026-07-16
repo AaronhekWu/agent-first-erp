@@ -6,6 +6,7 @@ import { X, Users, UserPlus, LogOut, CalendarCheck, Gauge } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { listCourseEnrollments } from "@/lib/api/courses-client";
 import type { CourseEnrollment, CourseRow } from "@/lib/api/courses";
+import type { Department } from "@/lib/api/lookups";
 import { RosterTab } from "./roster-tab";
 import { EnrollTab } from "./enroll-tab";
 import { AttendanceTab } from "./attendance-tab";
@@ -17,6 +18,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   course: CourseRow;
+  departments: Department[];
 }
 
 const TABS = [
@@ -28,7 +30,7 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-export function CourseManageModal({ open, onClose, course }: Props) {
+export function CourseManageModal({ open, onClose, course, departments }: Props) {
   const { has } = usePermissions();
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("plan");
@@ -128,7 +130,7 @@ export function CourseManageModal({ open, onClose, course }: Props) {
           )}
           {!loading && !error && (
             <>
-              {tab === "plan" && <CoursePlanTab course={course} canEdit={has("courses.plan")} onMutate={handleMutation} />}
+              {tab === "plan" && <CoursePlanTab course={course} departments={departments} canEdit={has("courses.plan") || has("courses.update")} onMutate={handleMutation} />}
               {tab === "roster" && (
                 <RosterTab
                   enrollments={enrollments}

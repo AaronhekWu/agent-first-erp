@@ -8,6 +8,7 @@ import { requestApproval } from "@/lib/api/approvals-client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { CourseManageModal } from "./course-manage-modal";
 import type { CourseRow } from "@/lib/api/courses";
+import type { Department } from "@/lib/api/lookups";
 import { canCompleteCourse, getCourseLifecycle, lessonProgress, type CourseLifecycle } from "@/lib/course-lifecycle";
 import { setCompletedCourseArchived } from "@/lib/api/courses-client";
 
@@ -19,7 +20,7 @@ const STATUS: Record<CourseLifecycle, { label: string; cls: string; ring: string
   completed: { label: "已结课", cls: "bg-blue-50 text-blue-700", ring: "ring-blue-200" },
 };
 
-export function CourseCard({ course, initialOpen = false }: { course: CourseRow; initialOpen?: boolean }) {
+export function CourseCard({ course, departments, initialOpen = false }: { course: CourseRow; departments: Department[]; initialOpen?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(initialOpen);
   const [busy, setBusy] = useState<"archive" | "delete" | "visibility" | null>(null);
@@ -178,7 +179,7 @@ export function CourseCard({ course, initialOpen = false }: { course: CourseRow;
           )}
         </div>
       </div>
-      <CourseManageModal open={open} onClose={() => setOpen(false)} course={course} />
+      <CourseManageModal open={open} onClose={() => setOpen(false)} course={course} departments={departments} />
     </>
   );
 }

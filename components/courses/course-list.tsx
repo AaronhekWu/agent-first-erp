@@ -1,8 +1,9 @@
 import { CourseCard } from "./course-card";
 import { UrlListPagination } from "@/components/ui/url-list-pagination";
 import type { CourseRow } from "@/lib/api/courses";
+import type { Department } from "@/lib/api/lookups";
 
-export function CourseList({ courses, page, pageSize, emptyMessage, selectedCourseId }: { courses: CourseRow[]; page: number; pageSize: number; emptyMessage: string; selectedCourseId?: string }) {
+export function CourseList({ courses, departments, page, pageSize, emptyMessage, selectedCourseId }: { courses: CourseRow[]; departments: Department[]; page: number; pageSize: number; emptyMessage: string; selectedCourseId?: string }) {
   const totalPages = Math.max(1, Math.ceil(courses.length / pageSize));
   const selectedIndex = selectedCourseId ? courses.findIndex((course) => course.course_id === selectedCourseId) : -1;
   const currentPage = selectedIndex >= 0
@@ -18,7 +19,7 @@ export function CourseList({ courses, page, pageSize, emptyMessage, selectedCour
             {emptyMessage}
           </div>
         )}
-        {pagedCourses.map((course) => <CourseCard key={course.course_id} course={course} initialOpen={course.course_id === selectedCourseId} />)}
+        {pagedCourses.map((course) => <CourseCard key={course.course_id} course={course} departments={departments} initialOpen={course.course_id === selectedCourseId} />)}
       </div>
       <UrlListPagination page={currentPage} pageSize={pageSize} totalItems={courses.length} />
     </div>

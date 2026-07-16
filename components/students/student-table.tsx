@@ -104,6 +104,13 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
     router.push(`/students?${params.toString()}`);
   };
 
+  const changePageSize = (nextPageSize: number) => {
+    const params = new URLSearchParams(sp.toString());
+    params.set("page", "1");
+    params.set("pageSize", String(nextPageSize));
+    router.push(`/students?${params.toString()}`);
+  };
+
   const selectedRows = rows.filter((r) => selected.has(r.id));
 
   const batchAction = (label: string) =>
@@ -412,8 +419,14 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
       <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3 text-sm">
         <div className="flex items-center gap-2 text-slate-500">
           <span>每页显示</span>
-          <select className="h-7 rounded border border-slate-200 bg-white px-1 text-xs">
-            <option value="20">20</option>
+          <select
+            value={pageSize}
+            onChange={(event) => changePageSize(Number(event.target.value))}
+            className="h-7 rounded border border-slate-200 bg-white px-1 text-xs"
+          >
+            {[20, 50, 100].map((value) => (
+              <option key={value} value={value}>{value}</option>
+            ))}
           </select>
         </div>
         <Pagination current={page} totalPages={totalPages} onChange={gotoPage} />

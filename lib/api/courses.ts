@@ -12,6 +12,14 @@ export interface CourseRow {
   fee: number;
   department_id: string | null;
   department_name: string | null;
+  description: string | null;
+  schedule_info: {
+    total_lessons?: number;
+    weekdays?: string[];
+    time?: string;
+    teacher_name?: string;
+    is_archived?: boolean;
+  } | null;
   total_enrolled: number;
   active_enrolled: number;
   completed_count: number;

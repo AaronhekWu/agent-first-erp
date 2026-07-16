@@ -3,17 +3,32 @@
 import { useEffect, useState } from "react";
 import { CalendarRange, CheckCircle2, CircleDashed, Save } from "lucide-react";
 import { Field, inputCls } from "@/components/ui/form";
-import { updateCoursePlan } from "@/lib/api/courses-client";
+import { updateCourseInfo } from "@/lib/api/courses-client";
 import { lessonProgress } from "@/lib/course-lifecycle";
 import { formatDate } from "@/lib/format";
 import type { CourseRow } from "@/lib/api/courses";
+import type { Department } from "@/lib/api/lookups";
 
-export function CoursePlanTab({ course, canEdit, onMutate }: { course: CourseRow; canEdit: boolean; onMutate: () => Promise<void> }) {
+const WEEKDAYS = [
+  { value: "mon", label: "周一" },
+  { value: "tue", label: "周二" },
+  { value: "wed", label: "周三" },
+  { value: "thu", label: "周四" },
+  { value: "fri", label: "周五" },
+  { value: "sat", label: "周六" },
+  { value: "sun", label: "周日" },
+];
+
+export function CoursePlanTab({ course, departments, canEdit, onMutate }: { course: CourseRow; departments: Department[]; canEdit: boolean; onMutate: () => Promise<void> }) {
   const progress = lessonProgress(course);
   const [totalLessons, setTotalLessons] = useState(String(course.total_lessons ?? ""));
   const [unitPrice, setUnitPrice] = useState(String(course.fee ?? ""));
   const [startDate, setStartDate] = useState(course.start_date ?? "");
   const [endDate, setEndDate] = useState(course.end_date ?? "");
+  const [departmentId, setDepartmentId] = useState(course.department_id ?? "");
+  const [weekdays, setWeekdays] = useState<string[]>(course.schedule_info?.weekdays ?? []);
+  const [classTime, setClassTime] = useState(course.schedule_info?.time ?? "");
+  const [teacherName, setTeacherName] = useState(course.schedule_info?.teacher_name ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -23,7 +38,17 @@ export function CoursePlanTab({ course, canEdit, onMutate }: { course: CourseRow
     setUnitPrice(String(course.fee ?? ""));
     setStartDate(course.start_date ?? "");
     setEndDate(course.end_date ?? "");
+    setDepartmentId(course.department_id ?? "");
+    setWeekdays(course.schedule_info?.weekdays ?? []);
+    setClassTime(course.schedule_info?.time ?? "");
+    setTeacherName(course.schedule_info?.teacher_name ?? "");
   }, [course]);
+
+  const toggleWeekday = (value: string) => {
+    setWeekdays((current) => current.includes(value)
+      ? current.filter((item) => item !== value)
+      : [...current, value]);
+  };
 
   const save = async () => {
     const count = Number(totalLessons);
@@ -37,12 +62,16 @@ export function CoursePlanTab({ course, canEdit, onMutate }: { course: CourseRow
     setError(null);
     setSaved(false);
     try {
-      await updateCoursePlan({
+      await updateCourseInfo({
         courseId: course.course_id,
         totalLessons: count,
         unitPrice: price,
         startDate,
         endDate,
+        departmentId: departmentId || null,
+        weekdays,
+        time: classTime.trim(),
+        teacherName: teacherName.trim(),
       });
       setSaved(true);
       await onMutate();
@@ -78,7 +107,7 @@ export function CoursePlanTab({ course, canEdit, onMutate }: { course: CourseRow
 
       {course.status !== "archived" && canEdit && (
         <div className="rounded-lg border border-slate-200 p-4">
-          <h3 className="mb-4 text-sm font-medium text-slate-800">编辑课程计划</h3>
+          <h3 className="mb-4 text-sm font-medium text-slate-800">编辑课程信息</h3>
           <div className="grid gap-4 md:grid-cols-4">
             <Field label="计划总课次" required>
               <input type="number" min={Math.max(1, progress.completed)} step={1} className={inputCls} value={totalLessons} onChange={(event) => setTotalLessons(event.target.value)} />
@@ -92,20 +121,51 @@ export function CoursePlanTab({ course, canEdit, onMutate }: { course: CourseRow
             <Field label="结束日期" required>
               <input type="date" className={inputCls} value={endDate} onChange={(event) => setEndDate(event.target.value)} />
             </Field>
+            <Field label="所属部门" className="md:col-span-2">
+              <select className={inputCls} value={departmentId} onChange={(event) => setDepartmentId(event.target.value)}>
+                <option value="">未指定</option>
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>{department.name}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="老师姓名" className="md:col-span-2">
+              <input className={inputCls} value={teacherName} onChange={(event) => setTeacherName(event.target.value)} placeholder="请输入授课老师姓名" />
+            </Field>
+            <Field label="上课星期" className="md:col-span-2">
+              <div className="flex min-h-10 flex-wrap items-center gap-1.5">
+                {WEEKDAYS.map((day) => {
+                  const active = weekdays.includes(day.value);
+                  return (
+                    <button
+                      key={day.value}
+                      type="button"
+                      onClick={() => toggleWeekday(day.value)}
+                      className={`h-8 rounded-md border px-3 text-xs transition ${active ? "border-brand-500 bg-brand-50 text-brand-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
+                    >
+                      {day.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+            <Field label="上课时段" className="md:col-span-2">
+              <input className={inputCls} value={classTime} onChange={(event) => setClassTime(event.target.value)} placeholder="如 18:00-20:00" />
+            </Field>
           </div>
           <div className="mt-4 flex items-center justify-end gap-3">
             {error && <span className="mr-auto text-sm text-red-600">{error}</span>}
-            {saved && <span className="mr-auto text-sm text-emerald-600">课程计划已保存</span>}
+            {saved && <span className="mr-auto text-sm text-emerald-600">课程信息已保存</span>}
             <button type="button" onClick={save} disabled={saving} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
               <Save className="h-4 w-4" />
-              {saving ? "保存中" : "保存计划"}
+              {saving ? "保存中" : "保存课程信息"}
             </button>
           </div>
         </div>
       )}
       {course.status !== "archived" && !canEdit && (
         <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          当前账号可查看课程计划，但没有修改课时、价格或课程周期的权限。
+          当前账号可查看课程信息，但没有编辑课程的权限。
         </div>
       )}
     </div>

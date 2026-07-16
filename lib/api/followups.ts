@@ -49,8 +49,11 @@ export interface FollowupOverview {
 export async function listFollowupOverview(): Promise<FollowupOverview> {
   const sb = createServerSupabase();
   const [{ data: tl, error: e1 }, { data: warn, error: e2 }] = await Promise.all([
-    sb.from("v_followup_timeline").select("*").order("created_at", { ascending: false }).limit(500),
-    sb.from("v_balance_warnings").select("*"),
+    sb.from("v_followup_timeline").select("*")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(500),
+    sb.from("v_balance_warnings").select("*").order("student_id"),
   ]);
   if (e1) throw e1;
   if (e2) throw e2;
@@ -114,6 +117,7 @@ export async function listFollowupTimelineForStudent(studentId: string): Promise
     .select("*")
     .eq("student_id", studentId)
     .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(200);
   if (error) throw error;
   return (data ?? []) as FollowupItem[];

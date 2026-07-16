@@ -68,6 +68,7 @@ export default async function CoursesPage({ searchParams }: PageProps) {
 
       <CourseList
         courses={displayCourses}
+        departments={departments}
         page={page}
         pageSize={pageSize}
         emptyMessage={showArchived ? "暂无归档课程" : "暂无课程，点击右上角「新增课程」创建第一门课"}

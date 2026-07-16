@@ -40,6 +40,7 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
   const [departmentId, setDepartmentId] = useState("");
   const [days, setDays] = useState<string[]>([]);
   const [time, setTime] = useState("18:00-20:00");
+  const [teacherName, setTeacherName] = useState("");
 
   const toggleDay = (d: string) =>
     setDays((cur) => (cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d]));
@@ -57,6 +58,7 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
     setDepartmentId("");
     setDays([]);
     setTime("18:00-20:00");
+    setTeacherName("");
     setError(null);
   };
 
@@ -96,7 +98,9 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
         p_department_id: departmentId || null,
         p_schedule_info: {
           total_lessons: Number(totalLessons),
-          ...(days.length > 0 ? { weekdays: days, time } : {}),
+          weekdays: days,
+          time: time.trim(),
+          teacher_name: teacherName.trim(),
         },
       });
       reset();
@@ -257,6 +261,14 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
             value={time}
             onChange={(e) => setTime(e.target.value)}
             placeholder="18:00-20:00"
+          />
+        </Field>
+        <Field label="老师姓名" className="col-span-2">
+          <input
+            className={inputCls}
+            value={teacherName}
+            onChange={(e) => setTeacherName(e.target.value)}
+            placeholder="请输入授课老师姓名"
           />
         </Field>
         <Field label="课程描述" className="col-span-2">

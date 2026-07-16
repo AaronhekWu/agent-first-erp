@@ -62,7 +62,10 @@ export async function listStudents(
   let q = sb
     .from("v_student_overview")
     .select("*", { count: "exact" })
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    // 批量导入的数据可能拥有相同 created_at；必须用唯一键做二级排序，
+    // 否则数据库分页的边界不稳定，同一学员会重复出现在多页末尾。
+    .order("id", { ascending: false });
 
   if (filters.keyword) {
     const kw = `%${filters.keyword}%`;
