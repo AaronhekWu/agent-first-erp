@@ -8,11 +8,12 @@ import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { getCourseLifecycle } from "@/lib/course-lifecycle";
 import { Gate } from "@/lib/auth/permissions-context";
+import { parseCourseSort, sortCourses } from "@/lib/list-sorting";
 
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  searchParams: { page?: string; pageSize?: string; archived?: string; course?: string };
+  searchParams: { page?: string; pageSize?: string; archived?: string; course?: string; sort?: string };
 }
 
 export default async function CoursesPage({ searchParams }: PageProps) {
@@ -21,8 +22,17 @@ export default async function CoursesPage({ searchParams }: PageProps) {
   const requestedPageSize = Number(searchParams.pageSize ?? "15");
   const pageSize = [15, 30, 45, 60, 75, 90].includes(requestedPageSize) ? requestedPageSize : 15;
   const showArchived = searchParams.archived === "1";
-  const displayCourses = courses.filter((course) => Boolean(course.is_archived) === showArchived);
+  const sort = parseCourseSort(searchParams.sort);
+  const displayCourses = sortCourses(
+    courses.filter((course) => Boolean(course.is_archived) === showArchived),
+    sort,
+  );
   const { departments } = lookups;
+  const archiveParams = new URLSearchParams();
+  if (!showArchived) archiveParams.set("archived", "1");
+  if (sort !== "default") archiveParams.set("sort", sort);
+  if (pageSize !== 15) archiveParams.set("pageSize", String(pageSize));
+  const archiveHref = archiveParams.toString() ? `/courses?${archiveParams.toString()}` : "/courses";
 
   const total = displayCourses.length;
   const activeCount = displayCourses.filter((course) => getCourseLifecycle(course) === "enrolling").length;
@@ -49,7 +59,7 @@ export default async function CoursesPage({ searchParams }: PageProps) {
             </Link>
           </Gate>
           <Link
-            href={showArchived ? "/courses" : "/courses?archived=1"}
+            href={archiveHref}
             className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-600 hover:bg-slate-50"
           >
             <Archive className="h-4 w-4" />
@@ -73,6 +83,7 @@ export default async function CoursesPage({ searchParams }: PageProps) {
         pageSize={pageSize}
         emptyMessage={showArchived ? "暂无归档课程" : "暂无课程，点击右上角「新增课程」创建第一门课"}
         selectedCourseId={searchParams.course}
+        sort={sort}
       />
     </div>
   );

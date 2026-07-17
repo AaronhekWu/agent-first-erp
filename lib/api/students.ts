@@ -1,4 +1,5 @@
 import { createServerSupabase } from "@/lib/supabase/server";
+import { parseStudentSort, type StudentSort } from "@/lib/list-sorting";
 
 export type { Counselor, Department, Role, Lookups } from "./lookups";
 export { getLookups } from "./lookups";
@@ -39,6 +40,7 @@ export interface StudentFilters {
   departmentId?: string;
   createdFrom?: string;
   createdTo?: string;
+  sort?: StudentSort;
 }
 
 export interface StudentListResult {
@@ -61,11 +63,7 @@ export async function listStudents(
   const sb = createServerSupabase();
   let q = sb
     .from("v_student_overview")
-    .select("*", { count: "exact" })
-    .order("created_at", { ascending: false })
-    // 批量导入的数据可能拥有相同 created_at；必须用唯一键做二级排序，
-    // 否则数据库分页的边界不稳定，同一学员会重复出现在多页末尾。
-    .order("id", { ascending: false });
+    .select("*", { count: "exact" });
 
   if (filters.keyword) {
     const kw = `%${filters.keyword}%`;
@@ -79,6 +77,20 @@ export async function listStudents(
   if (filters.departmentId) q = q.eq("department_id", filters.departmentId);
   if (filters.createdFrom) q = q.gte("created_at", filters.createdFrom);
   if (filters.createdTo) q = q.lte("created_at", filters.createdTo);
+
+  const sort = parseStudentSort(filters.sort);
+  // 每种顺序都以唯一键收尾，避免批量导入记录时间相同时跨页重复。
+  if (sort === "default") {
+    q = q.order("status", { ascending: true }).order("created_at", { ascending: false }).order("id", { ascending: false });
+  } else if (sort === "newest") {
+    q = q.order("created_at", { ascending: false }).order("id", { ascending: false });
+  } else if (sort === "oldest") {
+    q = q.order("created_at", { ascending: true }).order("id", { ascending: true });
+  } else if (sort === "name") {
+    q = q.order("name", { ascending: true }).order("created_at", { ascending: false }).order("id", { ascending: false });
+  } else {
+    q = q.order("active_enrollment_count", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false });
+  }
 
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;

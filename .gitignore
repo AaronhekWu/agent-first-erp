@@ -29,6 +29,7 @@ next-env.d.ts
 /.codex/config.toml
 
 # --- 工具产物 ---
+/outputs/
 .claude/
 .DS_Store
 *.log

@@ -1,7 +1,7 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
-import { LogOut, ArrowRightLeft, ChevronDown, ChevronUp, Lock } from "lucide-react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { LogOut, ArrowRightLeft, ChevronDown, ChevronUp, Lock, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency, maskPhone } from "@/lib/format";
 import { requestApproval, getLockedTargets } from "@/lib/api/approvals-client";
@@ -21,11 +21,40 @@ interface Props {
   onMutate: () => Promise<void>;
 }
 
+type RosterSort = "default" | "newest" | "name" | "remaining";
+
+const ROSTER_SORT_OPTIONS: { value: RosterSort; label: string }[] = [
+  { value: "default", label: "默认：在读优先 · 最新报名" },
+  { value: "newest", label: "报名时间：最新在前" },
+  { value: "name", label: "学员姓名" },
+  { value: "remaining", label: "剩余课时：从多到少" },
+];
+
 export function RosterTab({ enrollments, course, onMutate }: Props) {
   const [dropTarget, setDropTarget] = useState<CourseEnrollment | null>(null);
   const [transferTarget, setTransferTarget] = useState<CourseEnrollment | null>(null);
   const [pricingDetailId, setPricingDetailId] = useState<string | null>(null);
   const [locked, setLocked] = useState<Set<string>>(new Set());
+  const [sort, setSort] = useState<RosterSort>("default");
+
+  const sortedEnrollments = useMemo(() => [...enrollments].sort((a, b) => {
+    const enrolledAt = (value: CourseEnrollment) => Date.parse(value.enrolled_at) || 0;
+    if (sort === "default") {
+      const statusPriority = (value: CourseEnrollment) => value.status === "enrolled" ? 0 : 1;
+      return statusPriority(a) - statusPriority(b)
+        || enrolledAt(b) - enrolledAt(a)
+        || b.enrollment_id.localeCompare(a.enrollment_id);
+    }
+    if (sort === "newest") {
+      return enrolledAt(b) - enrolledAt(a) || b.enrollment_id.localeCompare(a.enrollment_id);
+    }
+    if (sort === "name") {
+      return a.student_name.localeCompare(b.student_name, "zh-CN", { numeric: true })
+        || enrolledAt(b) - enrolledAt(a);
+    }
+    return Number(b.remaining_lessons ?? 0) - Number(a.remaining_lessons ?? 0)
+      || enrolledAt(b) - enrolledAt(a);
+  }), [enrollments, sort]);
 
   const refreshLocked = () => {
     void getLockedTargets().then(setLocked);
@@ -34,9 +63,25 @@ export function RosterTab({ enrollments, course, onMutate }: Props) {
 
   return (
     <div>
-      <div className="mb-3 text-xs text-slate-500">
-        共 <span className="font-medium text-slate-800">{enrollments.length}</span> 条报名 ·
-        在读 <span className="font-medium text-emerald-600">{enrollments.filter((e) => e.status === "enrolled").length}</span>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+        <div>
+          共 <span className="font-medium text-slate-800">{enrollments.length}</span> 条报名 ·
+          在读 <span className="font-medium text-emerald-600">{enrollments.filter((e) => e.status === "enrolled").length}</span>
+        </div>
+        <label className="inline-flex items-center gap-2">
+          <ArrowUpDown className="h-3.5 w-3.5" />
+          <span>排序</span>
+          <select
+            aria-label="班级花名册排序"
+            value={sort}
+            onChange={(event) => setSort(event.target.value as RosterSort)}
+            className="h-8 min-w-48 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none hover:border-slate-300 focus:border-brand-500 focus:ring-1 focus:ring-brand-100"
+          >
+            {ROSTER_SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </label>
       </div>
       <div className="overflow-x-auto rounded-lg border border-slate-200">
         <table className="w-full min-w-[1080px] text-sm">
@@ -60,7 +105,7 @@ export function RosterTab({ enrollments, course, onMutate }: Props) {
                 </td>
               </tr>
             )}
-            {enrollments.map((e) => {
+            {sortedEnrollments.map((e) => {
               const st = STATUS_LABEL[e.status] ?? STATUS_LABEL.enrolled;
               const showPricing = pricingDetailId === e.enrollment_id;
               return (

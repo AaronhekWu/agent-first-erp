@@ -65,6 +65,8 @@ export function StudentFilters({
     if (departmentId) params.set("dept", departmentId);
     if (from) params.set("from", from);
     if (to) params.set("to", to);
+    const sort = sp.get("sort");
+    if (sort && sort !== "default") params.set("sort", sort);
     params.set("page", "1");
     router.push(`/students?${params.toString()}`);
   };

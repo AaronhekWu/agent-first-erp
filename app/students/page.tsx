@@ -27,6 +27,7 @@ interface PageProps {
     to?: string;
     page?: string;
     pageSize?: string;
+    sort?: string;
   };
 }
 
@@ -44,6 +45,7 @@ export default async function StudentsPage({ searchParams }: PageProps) {
     departmentId: searchParams.dept,
     createdFrom: searchParams.from,
     createdTo: searchParams.to,
+    sort: searchParams.sort as F["sort"],
   };
 
   const [kpis, list, lookups] = await Promise.all([
@@ -81,6 +83,7 @@ export default async function StudentsPage({ searchParams }: PageProps) {
         total={list.total}
         page={page}
         pageSize={pageSize}
+        sort={searchParams.sort}
       />
     </div>
   );

@@ -36,12 +36,15 @@ import { requestApproval } from "@/lib/api/approvals-client";
 import { batchDeleteStudents } from "@/lib/api/students-edge-client";
 import { graduateStudent, reactivateStudent } from "@/lib/api/create";
 import type { StudentRow } from "@/lib/api/students";
+import { parseStudentSort, STUDENT_SORT_OPTIONS } from "@/lib/list-sorting";
+import { UrlSortSelect } from "@/components/ui/url-sort-select";
 
 interface Props {
   rows: StudentRow[];
   total: number;
   page: number;
   pageSize: number;
+  sort?: string;
 }
 
 const COLS: { key: string; label: string; w?: string; align?: string }[] = [
@@ -60,7 +63,7 @@ const COLS: { key: string; label: string; w?: string; align?: string }[] = [
   { key: "action", label: "操作", w: "w-40", align: "text-left" },
 ];
 
-export function StudentTable({ rows, total, page, pageSize }: Props) {
+export function StudentTable({ rows, total, page, pageSize, sort: rawSort }: Props) {
   const router = useRouter();
   const sp = useSearchParams();
   const [active, setActive] = useState<StudentRow | null>(null);
@@ -68,6 +71,7 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
   const [graduationTarget, setGraduationTarget] = useState<StudentRow | null>(null);
   const [reactivationTarget, setReactivationTarget] = useState<StudentRow | null>(null);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const sort = parseStudentSort(rawSort);
 
   const allOnPageIds = useMemo(
     () => rows.filter((r) => r.status === "active").map((r) => r.id),
@@ -201,7 +205,7 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
           </div>
         </div>
       ) : (
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
           <div className="flex items-center gap-3 text-sm text-slate-600">
             <span>
               共 <span className="font-medium text-slate-800">{total.toLocaleString()}</span> 条
@@ -226,6 +230,7 @@ export function StudentTable({ rows, total, page, pageSize }: Props) {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <UrlSortSelect value={sort} options={STUDENT_SORT_OPTIONS} ariaLabel="学员排序" />
             <button
               onClick={() => router.refresh()}
               className="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100"
