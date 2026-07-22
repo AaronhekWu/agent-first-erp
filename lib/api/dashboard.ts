@@ -40,9 +40,18 @@ export interface DailyFlow {
   consume: number;
 }
 
+export interface DashboardAccess {
+  students: boolean;
+  courses: boolean;
+  finance: boolean;
+  followups: boolean;
+  audits: boolean;
+}
+
 export type DashboardData =
   | {
       role: "admin";
+      access: DashboardAccess;
       summary: DashSummary | null;
       pendingApprovals: number;
       approvalQueue: ApprovalBrief[];
@@ -53,10 +62,19 @@ export type DashboardData =
   | { role: "teacher"; myClasses: number; classes: TeacherClass[] }
   | { role: "generic" };
 
-export async function getDashboard(role: string | null): Promise<DashboardData> {
+export async function getDashboard(role: string | null, permissions: string[] = []): Promise<DashboardData> {
   const sb = createServerSupabase();
+  const allowed = new Set(permissions);
+  const isAdmin = role === "admin";
+  const access: DashboardAccess = {
+    students: isAdmin || allowed.has("students.view"),
+    courses: isAdmin || allowed.has("courses.view"),
+    finance: isAdmin || allowed.has("finance.view"),
+    followups: isAdmin || allowed.has("followups.view"),
+    audits: isAdmin || allowed.has("audits.view"),
+  };
 
-  if (role === "admin") {
+  if (isAdmin || permissions.length > 0) {
     const since = new Date();
     since.setDate(since.getDate() - 29);
     since.setHours(0, 0, 0, 0);
@@ -98,6 +116,7 @@ export async function getDashboard(role: string | null): Promise<DashboardData> 
 
     return {
       role: "admin",
+      access,
       summary: (summaryRes.data as DashSummary | null) ?? null,
       pendingApprovals: apprRes.count ?? 0,
       approvalQueue: (apprRes.data ?? []) as ApprovalBrief[],

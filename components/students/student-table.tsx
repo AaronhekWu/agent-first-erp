@@ -10,13 +10,11 @@ import {
   Eye,
   RefreshCw,
   Settings2,
-  Info,
   CheckSquare,
   Square,
   Minus,
   X,
   UserCog,
-  Mail,
   Trash2,
   Wallet,
   GraduationCap,
@@ -34,13 +32,14 @@ import { StudentDrawer } from "./student-drawer";
 import { Gate } from "@/lib/auth/permissions-context";
 import { requestApproval } from "@/lib/api/approvals-client";
 import { batchDeleteStudents } from "@/lib/api/students-edge-client";
-import { graduateStudent, reactivateStudent } from "@/lib/api/create";
-import type { StudentRow } from "@/lib/api/students";
+import { batchAssignStudents, graduateStudent, reactivateStudent } from "@/lib/api/create";
+import type { Counselor, StudentRow } from "@/lib/api/students";
 import { parseStudentSort, STUDENT_SORT_OPTIONS } from "@/lib/list-sorting";
 import { UrlSortSelect } from "@/components/ui/url-sort-select";
 
 interface Props {
   rows: StudentRow[];
+  counselors: Counselor[];
   total: number;
   page: number;
   pageSize: number;
@@ -63,13 +62,15 @@ const COLS: { key: string; label: string; w?: string; align?: string }[] = [
   { key: "action", label: "操作", w: "w-40", align: "text-left" },
 ];
 
-export function StudentTable({ rows, total, page, pageSize, sort: rawSort }: Props) {
+export function StudentTable({ rows, counselors, total, page, pageSize, sort: rawSort }: Props) {
   const router = useRouter();
   const sp = useSearchParams();
   const [active, setActive] = useState<StudentRow | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [graduationTarget, setGraduationTarget] = useState<StudentRow | null>(null);
   const [reactivationTarget, setReactivationTarget] = useState<StudentRow | null>(null);
+  const [batchCounselorId, setBatchCounselorId] = useState("");
+  const [batchTransferring, setBatchTransferring] = useState(false);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const sort = parseStudentSort(rawSort);
 
@@ -117,12 +118,44 @@ export function StudentTable({ rows, total, page, pageSize, sort: rawSort }: Pro
 
   const selectedRows = rows.filter((r) => selected.has(r.id));
 
-  const batchAction = (label: string) =>
-    alert(
-      `${label} — 共 ${selected.size} 个学员\n` +
-        selectedRows.map((r) => `· ${r.name} (${r.student_code ?? r.id.slice(0, 8)})`).join("\n") +
-        `\n\n该批量操作已收敛到 Edge Function 路径，待接入后将真实执行。`,
-    );
+  const exportRows = (items: StudentRow[], label: string) => {
+    const columns: Array<[string, (row: StudentRow) => unknown]> = [
+      ["学员编号", (row) => row.student_code ?? ""], ["姓名", (row) => row.name],
+      ["手机号", (row) => row.phone ?? ""], ["状态", (row) => row.status],
+      ["学校", (row) => row.school ?? ""], ["年级", (row) => row.grade ?? ""],
+      ["部门", (row) => row.department_name ?? ""], ["顾问", (row) => row.counselor_name ?? ""],
+      ["余额", (row) => row.balance], ["在读课程", (row) => row.active_enrollment_count],
+      ["创建时间", (row) => row.created_at],
+    ];
+    const escape = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+    const csv = `\uFEFF${columns.map(([header]) => escape(header)).join(",")}\r\n${items
+      .map((row) => columns.map(([, get]) => escape(get(row))).join(","))
+      .join("\r\n")}`;
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${label}-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const batchTransferCounselor = async () => {
+    if (!batchCounselorId) return alert("请选择目标顾问");
+    setBatchTransferring(true);
+    try {
+      const result = await batchAssignStudents({
+        p_student_ids: [...selected],
+        p_counselor_id: batchCounselorId,
+      }) as { updated?: number };
+      alert(`已转移 ${result.updated ?? selected.size} 名学员`);
+      clearSelection();
+      router.refresh();
+    } catch (error) {
+      alert((error as Error).message);
+    } finally {
+      setBatchTransferring(false);
+    }
+  };
 
   const [batchDeleting, setBatchDeleting] = useState(false);
   const batchDelete = async () => {
@@ -196,9 +229,21 @@ export function StudentTable({ rows, total, page, pageSize, sort: rawSort }: Pro
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <BatchBtn icon={UserCog} label="批量转移顾问" onClick={() => batchAction("批量转移顾问")} />
-            <BatchBtn icon={Mail} label="批量发短信" onClick={() => batchAction("批量发短信")} />
-            <BatchBtn icon={Download} label="导出选中" onClick={() => batchAction("导出选中学员")} />
+            <Gate keys="students.update">
+              <select
+                value={batchCounselorId}
+                onChange={(event) => setBatchCounselorId(event.target.value)}
+                className="h-8 rounded-md border border-brand-200 bg-white px-2 text-xs text-slate-700"
+                aria-label="目标顾问"
+              >
+                <option value="">选择目标顾问</option>
+                {counselors.map((counselor) => <option key={counselor.id} value={counselor.id}>{counselor.display_name}</option>)}
+              </select>
+              <BatchBtn icon={UserCog} label={batchTransferring ? "转移中…" : "转移顾问"} onClick={batchTransferCounselor} />
+            </Gate>
+            <Gate keys="students.export">
+              <BatchBtn icon={Download} label="导出选中" onClick={() => exportRows(selectedRows, "选中学员")} />
+            </Gate>
             <Gate keys="students.delete">
               <BatchBtn icon={Trash2} label={batchDeleting ? "删除中…" : "批量删除"} danger onClick={batchDelete} />
             </Gate>
@@ -210,24 +255,16 @@ export function StudentTable({ rows, total, page, pageSize, sort: rawSort }: Pro
             <span>
               共 <span className="font-medium text-slate-800">{total.toLocaleString()}</span> 条
             </span>
-            <button
-              type="button"
-              onClick={() => alert("请先勾选学员，再选择批量操作")}
-              className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50"
-            >
-              批量操作
-            </button>
-            <button
-              type="button"
-              onClick={() => alert("导出当前筛选 (CSV) — 即将上线")}
-              className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50"
-            >
-              <Download className="h-3.5 w-3.5" />
-              导出
-            </button>
-            <span className="text-xs text-slate-400 inline-flex items-center gap-1">
-              主数据源: v_student_overview <Info className="h-3 w-3" />
-            </span>
+            <Gate keys="students.export">
+              <button
+                type="button"
+                onClick={() => exportRows(rows, "当前页学员")}
+                className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50"
+              >
+                <Download className="h-3.5 w-3.5" />
+                导出当前页
+              </button>
+            </Gate>
           </div>
           <div className="flex items-center gap-2">
             <UrlSortSelect value={sort} options={STUDENT_SORT_OPTIONS} ariaLabel="学员排序" />

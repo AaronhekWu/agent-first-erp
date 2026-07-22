@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { Search, RotateCcw, SlidersHorizontal } from "lucide-react";
+import { Search, RotateCcw } from "lucide-react";
 import type { Counselor, Department } from "@/lib/api/students";
 
 interface Props {
@@ -212,13 +212,6 @@ export function StudentFilters({
         >
           <RotateCcw className="h-4 w-4" />
           重置
-        </button>
-        <button
-          type="button"
-          className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-4 text-sm text-slate-700 hover:bg-slate-50"
-        >
-          <SlidersHorizontal className="h-4 w-4" />
-          高级筛选
         </button>
         <span className="ml-1 text-xs text-slate-400">
           支持后台常用模糊搜索：输入 &ldquo;王&rdquo; 可匹配 &ldquo;王A&rdquo;

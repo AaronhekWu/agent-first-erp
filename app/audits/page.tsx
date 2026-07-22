@@ -3,11 +3,14 @@ import { ApprovalList, type ApprovalRow } from "@/components/audits/approval-lis
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getMe } from "@/lib/auth/me";
 import { cn } from "@/lib/utils";
+import { hasServerPermission } from "@/lib/auth/access";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default async function AuditsPage() {
   const [{ rows, unavailable }, me] = await Promise.all([listApprovals(), getMe()]);
+  if (!hasServerPermission(me, "audits.view")) redirect("/dashboard");
   const pending = rows.filter((r) => r.status === "pending").length;
   const approved = rows.filter((r) => r.status === "approved").length;
   const rejected = rows.filter((r) => r.status === "rejected").length;
@@ -46,7 +49,7 @@ async function listApprovals(): Promise<{ rows: ApprovalRow[]; unavailable: bool
   const sb = createServerSupabase();
   const { data, error } = await sb
     .from("aud_approvals")
-    .select("id, type, title, reason, target_label, amount, status, requested_by, reviewed_by, reviewer_note, execution_status, created_at, reviewed_at, executed_at")
+    .select("id, type, title, reason, target_label, amount, status, requested_by, reviewed_by, reviewer_note, execution_status, created_at, reviewed_at, executed_at, reversed_at, reversal_note")
     .order("created_at", { ascending: false })
     .limit(100);
   if (error) {

@@ -34,10 +34,10 @@ export default async function StudentDetailPage({ params }: Props) {
   const lessons = detail.enrollments.reduce(
     (acc, e) => {
       const total = Number(e.total_lessons ?? 0);
-      const used = Number(e.used_lessons ?? 0);
+      const used = Number(e.consumed_lessons ?? 0);
       acc.total += total;
       acc.used += used;
-      acc.remaining += Math.max(0, total - used);
+      acc.remaining += Number(e.remaining_lessons ?? total - used);
       return acc;
     },
     { total: 0, used: 0, remaining: 0 },
@@ -86,7 +86,11 @@ export default async function StudentDetailPage({ params }: Props) {
           <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm md:grid-cols-3">
             <InfoLine icon={Phone} label="手机号" value={maskPhone(s.phone)} />
             <InfoLine icon={User} label="性别" value={genderLabel(s.gender)} />
-            <InfoLine icon={Calendar} label="生日" value={s.birth_date ?? "未填写"} />
+            <InfoLine
+              icon={Calendar}
+              label="生日 / 年龄"
+              value={s.birth_date ? `${formatDate(s.birth_date)} · ${ageFromBirthDate(s.birth_date)} 岁` : "未填写"}
+            />
             <InfoLine icon={BookOpen} label="学校" value={s.school ?? "未填写"} />
             <InfoLine icon={BookOpen} label="年级" value={s.grade ?? "未填写"} />
             <InfoLine icon={User} label="顾问" value={s.counselor_name ?? "未分配"} />
@@ -108,6 +112,45 @@ export default async function StudentDetailPage({ params }: Props) {
               {s.notes}
             </div>
           )}
+
+          <div className="mt-5 border-t border-slate-100 pt-4">
+            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
+              <BookOpen className="h-4 w-4 text-brand-500" />
+              报名记录 ({detail.enrollments.length})
+            </div>
+            {detail.enrollments.length === 0 ? (
+              <div className="rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">暂无报名记录</div>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-slate-100">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-xs text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2 text-left">课程</th>
+                      <th className="px-3 py-2 text-left">状态</th>
+                      <th className="px-3 py-2 text-right">已消 / 总课时</th>
+                      <th className="px-3 py-2 text-left">报名时间</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {detail.enrollments.map((enrollment) => (
+                      <tr key={enrollment.id} className="hover:bg-slate-50">
+                        <td className="px-3 py-2">
+                          <Link href={`/courses?course=${enrollment.course_id}`} className="font-medium text-brand-600 hover:underline">
+                            {enrollment.course_name ?? "未知课程"}
+                          </Link>
+                        </td>
+                        <td className="px-3 py-2 text-slate-600">{enrollmentStatusLabel(enrollment.status)}</td>
+                        <td className="px-3 py-2 text-right text-slate-600">
+                          {enrollment.consumed_lessons ?? 0} / {enrollment.total_lessons ?? 0}
+                        </td>
+                        <td className="px-3 py-2 text-slate-600">{formatDate(enrollment.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
 
         <MonthCalendar studentId={s.id} />
@@ -141,39 +184,8 @@ export default async function StudentDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* 报名 + 跟进 */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card title={`报名记录 (${detail.enrollments.length})`}>
-          {detail.enrollments.length === 0 ? (
-            <EmptyHint text="暂无报名记录" />
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-xs text-slate-500">
-                <tr>
-                  <th className="px-3 py-2 text-left">课程</th>
-                  <th className="px-3 py-2 text-left">状态</th>
-                  <th className="px-3 py-2 text-right">课时</th>
-                  <th className="px-3 py-2 text-left">报名时间</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {detail.enrollments.map((e) => (
-                  <tr key={e.id}>
-                    <td className="px-3 py-2 text-slate-800">{e.course_name ?? "未知课程"}</td>
-                    <td className="px-3 py-2 text-slate-600">{e.status}</td>
-                    <td className="px-3 py-2 text-right text-slate-600">
-                      {e.used_lessons ?? 0} / {e.total_lessons ?? 0}
-                    </td>
-                    <td className="px-3 py-2 text-slate-600">
-                      {formatDate(e.created_at)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </Card>
-
+      {/* 跟进 */}
+      <div>
         <Card title={`跟进记录 (${detail.followups.length})`}>
           {detail.followups.length === 0 ? (
             <EmptyHint text="暂无跟进记录" />
@@ -216,6 +228,25 @@ function genderLabel(g?: string | null): string {
   if (g === "male") return "男";
   if (g === "female") return "女";
   return "未填写";
+}
+
+function ageFromBirthDate(value: string): number {
+  const birth = new Date(`${value}T00:00:00`);
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const beforeBirthday = today.getMonth() < birth.getMonth()
+    || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate());
+  if (beforeBirthday) age -= 1;
+  return Math.max(0, age);
+}
+
+function enrollmentStatusLabel(status: string): string {
+  return ({
+    enrolled: "在读",
+    completed: "已完成",
+    cancelled: "已退课",
+    transferred: "已转课",
+  } as Record<string, string>)[status] ?? "未知状态";
 }
 
 function InfoLine({

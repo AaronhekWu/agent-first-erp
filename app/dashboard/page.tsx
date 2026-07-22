@@ -12,14 +12,17 @@ import {
 import { getMe } from "@/lib/auth/me";
 import { getDashboard } from "@/lib/api/dashboard";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { ROLE_LABELS } from "@/lib/permissions";
+import { PERMISSION_CATALOG, ROLE_DEFAULTS, ROLE_LABELS } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const me = await getMe();
   const role = me?.user.primary_role ?? null;
-  const data = await getDashboard(role);
+  const permissions = role === "admin"
+    ? PERMISSION_CATALOG.map((permission) => permission.key)
+    : me?.permissions ?? (role ? ROLE_DEFAULTS[role] ?? [] : []);
+  const data = await getDashboard(role, permissions);
   const roleLabel = role ? ROLE_LABELS[role] ?? role : "访客";
 
   return (
@@ -99,34 +102,34 @@ function AdminView({ data }: { data: Extract<Awaited<ReturnType<typeof getDashbo
   return (
     <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Tile icon={Wallet} label="近30天充值" value={formatCurrency(s?.finance.recharges ?? 0)} tone="emerald" />
-        <Tile icon={TrendingUp} label="近30天消课" value={formatCurrency(s?.finance.consumption ?? 0)} tone="blue" />
-        <Tile icon={Wallet} label="近30天净收入" value={formatCurrency(s?.finance.net_revenue ?? 0)} tone="slate" />
-        <Tile icon={CheckSquare} label="待审批" value={data.pendingApprovals} sub="点击进入审批中心" tone={data.pendingApprovals > 0 ? "amber" : "slate"} href="/audits" />
+        {data.access.finance && <Tile icon={Wallet} label="近30天充值" value={formatCurrency(s?.finance.recharges ?? 0)} tone="emerald" />}
+        {data.access.finance && <Tile icon={TrendingUp} label="近30天消课" value={formatCurrency(s?.finance.consumption ?? 0)} tone="blue" />}
+        {data.access.finance && <Tile icon={Wallet} label="近30天净收入" value={formatCurrency(s?.finance.net_revenue ?? 0)} tone="slate" />}
+        {data.access.audits && <Tile icon={CheckSquare} label="待审批" value={data.pendingApprovals} sub="点击进入审批中心" tone={data.pendingApprovals > 0 ? "amber" : "slate"} href="/audits" />}
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
-        <Tile icon={Users} label="学员总数" value={s?.students.total ?? 0} sub={`在读 ${s?.students.active ?? 0}`} href="/students" />
-        <Tile icon={BookOpen} label="在读班级" value={s?.courses.active ?? 0} sub={`在读报名 ${s?.courses.active_enrollments ?? 0}`} href="/courses" />
-        <Tile icon={Clock} label="待跟进" value={s?.followups.pending ?? 0} sub="点击进入跟进中心" href="/followups" />
+        {data.access.students && <Tile icon={Users} label="学员总数" value={s?.students.total ?? 0} sub={`在读 ${s?.students.active ?? 0}`} href="/students" />}
+        {data.access.courses && <Tile icon={BookOpen} label="在读班级" value={s?.courses.active ?? 0} sub={`在读报名 ${s?.courses.active_enrollments ?? 0}`} href="/courses" />}
+        {data.access.followups && <Tile icon={Clock} label="待跟进" value={s?.followups.pending ?? 0} sub="点击进入跟进中心" href="/followups" />}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+      {(data.access.finance || data.access.students) && <div className="grid gap-5 lg:grid-cols-3">
+        {data.access.finance && <div className="lg:col-span-2">
           <Panel title="近 30 天充值 / 消课趋势（各按峰值归一显示走势）">
             <TrendChart daily={data.daily} />
           </Panel>
-        </div>
-        <Panel title="学员状态分布">
+        </div>}
+        {data.access.students && <Panel title="学员状态分布">
           <StatusDonut
             active={s?.students.active ?? 0}
             graduated={data.graduated}
             total={s?.students.total ?? 0}
           />
-        </Panel>
-      </div>
+        </Panel>}
+      </div>}
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Panel title="月度流水（充值 / 消课）">
+      {(data.access.finance || data.access.audits) && <div className="grid gap-5 lg:grid-cols-2">
+        {data.access.finance && <Panel title="月度流水（充值 / 消课）">
           <div className="space-y-3 px-5 py-4">
             {(s?.monthly_revenue ?? []).length === 0 && <div className="py-6 text-center text-sm text-slate-400">暂无数据</div>}
             {(s?.monthly_revenue ?? []).map((m) => {
@@ -153,9 +156,9 @@ function AdminView({ data }: { data: Extract<Awaited<ReturnType<typeof getDashbo
               );
             })}
           </div>
-        </Panel>
+        </Panel>}
 
-        <Panel title="待审批队列" action={<Link href="/audits" className="text-xs text-brand-600 hover:underline">全部</Link>}>
+        {data.access.audits && <Panel title="待审批队列" action={<Link href="/audits" className="text-xs text-brand-600 hover:underline">全部</Link>}>
           <div className="divide-y divide-slate-100">
             {data.approvalQueue.length === 0 && <div className="px-5 py-10 text-center text-sm text-slate-400">暂无待审批</div>}
             {data.approvalQueue.map((a) => (
@@ -168,8 +171,8 @@ function AdminView({ data }: { data: Extract<Awaited<ReturnType<typeof getDashbo
               </Link>
             ))}
           </div>
-        </Panel>
-      </div>
+        </Panel>}
+      </div>}
     </div>
   );
 }

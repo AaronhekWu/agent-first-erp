@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, ChevronDown, ChevronUp, Clock, PlayCircle, XCircle } from "lucide-react";
-import { reviewApproval } from "@/lib/api/approvals-client";
+import { reverseApproval, reviewApproval } from "@/lib/api/approvals-client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { ListPagination } from "@/components/ui/list-pagination";
@@ -28,6 +28,8 @@ export interface ApprovalRow {
   created_at: string;
   reviewed_at: string | null;
   executed_at: string | null;
+  reversed_at: string | null;
+  reversal_note: string | null;
 }
 
 const STATUS_META = {
@@ -175,6 +177,26 @@ export function ApprovalList({ rows, canReview }: { rows: ApprovalRow[]; canRevi
                         </button>
                       </>
                     )}
+                    {row.status === "approved" && row.execution_status === "succeeded" && canReview && !row.reversed_at && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const reason = prompt(`驳回并撤销「${row.title}」的原因`);
+                          if (reason === null) return;
+                          if (!reason.trim()) return alert("撤销原因必填");
+                          if (!confirm("确认撤销已执行的业务动作？余额、课时和状态会按原记录回退。")) return;
+                          try {
+                            await reverseApproval(row.id, reason.trim());
+                            router.refresh();
+                          } catch (error) {
+                            alert((error as Error).message);
+                          }
+                        }}
+                        className="h-8 rounded-md border border-red-200 px-3 text-xs text-red-600 hover:bg-red-50"
+                      >
+                        驳回并撤销
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -190,6 +212,8 @@ export function ApprovalList({ rows, canReview }: { rows: ApprovalRow[]; canRevi
                     {row.status === "approved" && row.executed_at && (
                       <Detail label="处理时间" value={formatDate(row.executed_at, true)} />
                     )}
+                    {row.reversed_at && <Detail label="撤销时间" value={formatDate(row.reversed_at, true)} />}
+                    {row.reversal_note && <Detail label="撤销原因" value={row.reversal_note} danger />}
                     {row.execution_status === "failed" && (
                       <Detail label="处理结果" value="处理未完成，请管理员重试或查看系统日志" danger />
                     )}

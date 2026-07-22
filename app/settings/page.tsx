@@ -6,11 +6,14 @@ import { getCompany } from "@/lib/api/company";
 import { listStaff } from "@/lib/api/campus";
 import { listStudents } from "@/lib/api/students";
 import { getMe } from "@/lib/auth/me";
+import { hasServerPermission } from "@/lib/auth/access";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const me = await getMe();
+  if (!hasServerPermission(me, "settings.manage")) redirect("/dashboard");
   const meId = me?.user.id ?? null;
   const isAdmin = me?.user.primary_role === "admin";
 

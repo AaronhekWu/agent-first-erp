@@ -45,7 +45,8 @@ export interface StudentDetail {
     status: string;
     created_at: string;
     total_lessons?: number | null;
-    used_lessons?: number | null;
+    consumed_lessons?: number | null;
+    remaining_lessons?: number | null;
   }>;
   transactions: Array<{
     id: string;

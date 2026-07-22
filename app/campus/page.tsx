@@ -2,6 +2,9 @@ import { listDepartmentsDetail, listStaff } from "@/lib/api/campus";
 import { Tabs } from "@/components/settings/tabs";
 import { DepartmentTree } from "@/components/campus/department-tree";
 import { StaffTable } from "@/components/campus/staff-table";
+import { getMe } from "@/lib/auth/me";
+import { hasServerPermission } from "@/lib/auth/access";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +13,8 @@ interface PageProps {
 }
 
 export default async function CampusPage({ searchParams }: PageProps) {
+  const me = await getMe();
+  if (!hasServerPermission(me, "campus.manage")) redirect("/dashboard");
   const [departments, staff] = await Promise.all([
     listDepartmentsDetail(),
     listStaff(),

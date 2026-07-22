@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { Field, inputCls, textareaCls } from "@/components/ui/form";
-import { createCourse } from "@/lib/api/create";
+import { createCourse, enrollStudent } from "@/lib/api/create";
+import { searchStudents } from "@/lib/api/courses-client";
+import type { StudentSearchResult } from "@/lib/api/courses";
 import type { Department } from "@/lib/api/students";
 
 interface Props {
@@ -41,6 +43,22 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
   const [days, setDays] = useState<string[]>([]);
   const [time, setTime] = useState("18:00-20:00");
   const [teacherName, setTeacherName] = useState("");
+  const [studentQuery, setStudentQuery] = useState("");
+  const [studentResults, setStudentResults] = useState<StudentSearchResult[]>([]);
+  const [selectedStudents, setSelectedStudents] = useState<StudentSearchResult[]>([]);
+
+  useEffect(() => {
+    if (!open || studentQuery.trim().length < 1) {
+      setStudentResults([]);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void searchStudents(studentQuery.trim(), 12)
+        .then((rows) => setStudentResults(rows.filter((row) => !selectedStudents.some((item) => item.id === row.id))))
+        .catch((caught) => setError((caught as Error).message));
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [open, studentQuery, selectedStudents]);
 
   const toggleDay = (d: string) =>
     setDays((cur) => (cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d]));
@@ -59,6 +77,9 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
     setDays([]);
     setTime("18:00-20:00");
     setTeacherName("");
+    setStudentQuery("");
+    setStudentResults([]);
+    setSelectedStudents([]);
     setError(null);
   };
 
@@ -86,7 +107,7 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      await createCourse({
+      const created = await createCourse({
         p_name: name.trim(),
         p_subject: subject.trim(),
         p_level: level.trim(),
@@ -103,9 +124,21 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
           teacher_name: teacherName.trim(),
         },
       });
+      const courseId = (created as { course_id?: string } | null)?.course_id;
+      let failedEnrollments = 0;
+      if (courseId && selectedStudents.length > 0) {
+        const results = await Promise.allSettled(selectedStudents.map((student) => enrollStudent({
+          p_student_id: student.id,
+          p_course_id: courseId,
+        })));
+        failedEnrollments = results.filter((result) => result.status === "rejected").length;
+      }
       reset();
       onClose();
       router.refresh();
+      if (failedEnrollments > 0) {
+        alert(`课程已创建，其中 ${failedEnrollments} 名学员报名失败，请在课程内补录。`);
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -156,6 +189,14 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="如 高一数学一对一精品班"
+          />
+        </Field>
+        <Field label="老师姓名" className="col-span-2">
+          <input
+            className={inputCls}
+            value={teacherName}
+            onChange={(e) => setTeacherName(e.target.value)}
+            placeholder="请输入授课老师姓名"
           />
         </Field>
         <Field label="学科" required>
@@ -234,6 +275,49 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
             ))}
           </select>
         </Field>
+        <Field label="同时报名学员（可多选）" className="col-span-2">
+          <div className="space-y-2">
+            <input
+              className={inputCls}
+              value={studentQuery}
+              onChange={(event) => setStudentQuery(event.target.value)}
+              placeholder="输入姓名、手机号或学员编号搜索"
+            />
+            {selectedStudents.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {selectedStudents.map((student) => (
+                  <button
+                    key={student.id}
+                    type="button"
+                    onClick={() => setSelectedStudents((current) => current.filter((item) => item.id !== student.id))}
+                    className="rounded-full bg-brand-50 px-2.5 py-1 text-xs text-brand-700 hover:bg-brand-100"
+                    title="点击移除"
+                  >
+                    {student.name} ×
+                  </button>
+                ))}
+              </div>
+            )}
+            {studentResults.length > 0 && (
+              <div className="max-h-36 overflow-y-auto rounded-md border border-slate-200 p-1">
+                {studentResults.map((student) => (
+                  <button
+                    key={student.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedStudents((current) => [...current, student]);
+                      setStudentQuery("");
+                    }}
+                    className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm hover:bg-slate-50"
+                  >
+                    <span className="font-medium text-slate-700">{student.name}</span>
+                    <span className="text-xs text-slate-400">{student.student_code ?? student.phone ?? "无编号"}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </Field>
         <Field label="上课星期" className="col-span-2">
           <div className="flex flex-wrap gap-1.5">
             {WEEKDAYS.map((w) => {
@@ -261,14 +345,6 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
             value={time}
             onChange={(e) => setTime(e.target.value)}
             placeholder="18:00-20:00"
-          />
-        </Field>
-        <Field label="老师姓名" className="col-span-2">
-          <input
-            className={inputCls}
-            value={teacherName}
-            onChange={(e) => setTeacherName(e.target.value)}
-            placeholder="请输入授课老师姓名"
           />
         </Field>
         <Field label="课程描述" className="col-span-2">

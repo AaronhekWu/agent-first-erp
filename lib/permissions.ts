@@ -8,6 +8,7 @@ export interface PermissionItem {
 }
 
 export const PERMISSION_CATALOG: PermissionItem[] = [
+  { key: "dashboard.view", label: "查看仪表盘", group: "仪表盘" },
   { key: "students.view",   label: "查看学员", group: "学员" },
   { key: "students.create", label: "新增学员", group: "学员" },
   { key: "students.update", label: "编辑学员", group: "学员" },
@@ -48,13 +49,14 @@ export const ROLE_LABELS: Record<string, string> = {
 export const ROLE_DEFAULTS: Record<string, string[]> = {
   admin: PERMISSION_CATALOG.map((p) => p.key),
   counselor: [
+    "dashboard.view",
     "students.view", "students.create", "students.update",
     "courses.view", "courses.enroll", "finance.view", "finance.recharge",
     "followups.view", "followups.create",
   ],
   // 教师入职默认只读; 点名等写权限须主管在成员编辑里显式勾选授权 (与后端 has_permission 一致)
   teacher: [
-    "students.view", "courses.view", "followups.view",
+    "dashboard.view", "students.view", "courses.view", "followups.view",
   ],
   viewer: PERMISSION_CATALOG
     .filter((p) => p.key.endsWith(".view"))

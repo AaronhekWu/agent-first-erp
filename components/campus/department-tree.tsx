@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronRight, ChevronDown, Plus, Edit2, Trash2, Crown, User } from "lucide-react";
+import { ChevronRight, ChevronDown, Plus, Edit2, Trash2, Crown, User, UserMinus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { requestApproval } from "@/lib/api/approvals-client";
 import { DepartmentEditModal } from "./department-edit-modal";
 import type { DepartmentDetail, StaffRow } from "@/lib/api/campus";
+import { removeStaffFromDepartment } from "@/lib/api/create";
 
 interface TreeNode extends DepartmentDetail {
   children: TreeNode[];
@@ -90,6 +91,19 @@ export function DepartmentTree({ departments, staff }: Props) {
     }
   };
 
+  const handleRemoveMember = async (member: StaffRow) => {
+    if (!confirm(`确认将「${member.display_name}」移出当前部门？账号、角色和权限都会保留。`)) return;
+    setBusy(true);
+    try {
+      await removeStaffFromDepartment(member.id);
+      router.refresh();
+    } catch (error) {
+      alert((error as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
@@ -163,8 +177,18 @@ export function DepartmentTree({ departments, staff }: Props) {
                   <div className="space-y-1">
                     {selectedMembers.length === 0 && <div className="text-slate-400">暂无成员</div>}
                     {selectedMembers.slice(0, 8).map((m) => (
-                      <div key={m.id} className="rounded bg-slate-50 px-2 py-1 text-slate-600">
-                        {m.display_name} {m.primary_role ? `· ${m.primary_role}` : ""}
+                      <div key={m.id} className="flex items-center gap-2 rounded bg-slate-50 px-2 py-1 text-slate-600">
+                        <span>{m.display_name} {m.primary_role ? `· ${m.primary_role}` : ""}</span>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => handleRemoveMember(m)}
+                          className="ml-auto inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-600 disabled:opacity-50"
+                          title="仅移出部门，不停用账号、不修改权限"
+                        >
+                          <UserMinus className="h-3.5 w-3.5" />
+                          移出部门
+                        </button>
                       </div>
                     ))}
                   </div>

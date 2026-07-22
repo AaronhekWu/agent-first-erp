@@ -17,27 +17,30 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLayout } from "./layout-context";
+import { usePermissions } from "@/lib/auth/permissions-context";
 
 interface NavItem {
   href: string;
   label: string;
   Icon: typeof Users;
+  permission: string;
 }
 
 const NAV: NavItem[] = [
-  { href: "/dashboard", label: "仪表盘", Icon: LayoutDashboard },
-  { href: "/students", label: "学员管理", Icon: Users },
-  { href: "/courses", label: "课程管理", Icon: BookOpen },
-  { href: "/finance", label: "财务管理", Icon: Wallet },
-  { href: "/followups", label: "跟进记录", Icon: ClipboardList },
-  { href: "/audits", label: "审批中心", Icon: CheckSquare },
-  { href: "/campus", label: "校区管理", Icon: Building2 },
-  { href: "/settings", label: "系统设置", Icon: Settings },
+  { href: "/dashboard", label: "仪表盘", Icon: LayoutDashboard, permission: "dashboard.view" },
+  { href: "/students", label: "学员管理", Icon: Users, permission: "students.view" },
+  { href: "/courses", label: "课程管理", Icon: BookOpen, permission: "courses.view" },
+  { href: "/finance", label: "财务管理", Icon: Wallet, permission: "finance.view" },
+  { href: "/followups", label: "跟进记录", Icon: ClipboardList, permission: "followups.view" },
+  { href: "/audits", label: "审批中心", Icon: CheckSquare, permission: "audits.view" },
+  { href: "/campus", label: "校区管理", Icon: Building2, permission: "campus.manage" },
+  { href: "/settings", label: "系统设置", Icon: Settings, permission: "settings.manage" },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const { collapsed, toggle } = useLayout();
+  const { has, hasAny } = usePermissions();
   const ToggleIcon = collapsed ? PanelLeftOpen : PanelLeftClose;
 
   return (
@@ -65,7 +68,9 @@ export function Sidebar() {
 
       <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
         <ul className="space-y-1">
-          {NAV.map(({ href, label, Icon }) => {
+          {NAV.filter((item) => item.href === "/dashboard"
+            ? has(item.permission) || hasAny("students.view", "courses.view", "finance.view", "followups.view", "audits.view")
+            : has(item.permission)).map(({ href, label, Icon }) => {
             const active =
               pathname === href || pathname.startsWith(href + "/");
             return (

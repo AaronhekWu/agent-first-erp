@@ -7,6 +7,9 @@ import { ConsumeForm } from "@/components/finance/consume-form";
 import { TransactionList } from "@/components/finance/transaction-list";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { getMe } from "@/lib/auth/me";
+import { hasServerPermission } from "@/lib/auth/access";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +20,8 @@ interface PageProps {
 const FINANCE_TABS = ["recharge", "refund", "consume", "transactions"] as const;
 
 export default async function FinancePage({ searchParams }: PageProps) {
+  const me = await getMe();
+  if (!hasServerPermission(me, "finance.view")) redirect("/dashboard");
   const activeTab = FINANCE_TABS.includes(searchParams.tab as (typeof FINANCE_TABS)[number])
     ? searchParams.tab
     : "recharge";

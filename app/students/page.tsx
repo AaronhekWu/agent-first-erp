@@ -80,6 +80,7 @@ export default async function StudentsPage({ searchParams }: PageProps) {
 
       <StudentTable
         rows={list.rows}
+        counselors={counselors}
         total={list.total}
         page={page}
         pageSize={pageSize}

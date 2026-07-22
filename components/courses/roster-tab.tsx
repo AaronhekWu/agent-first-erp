@@ -5,7 +5,8 @@ import { LogOut, ArrowRightLeft, ChevronDown, ChevronUp, Lock, ArrowUpDown } fro
 import { cn } from "@/lib/utils";
 import { formatCurrency, maskPhone } from "@/lib/format";
 import { requestApproval, getLockedTargets } from "@/lib/api/approvals-client";
-import { listActiveCourseOptions } from "@/lib/api/courses-client";
+import { listActiveCourseOptions, updateEnrollmentUnitPrice } from "@/lib/api/courses-client";
+import { usePermissions } from "@/lib/auth/permissions-context";
 import type { ActiveCourseOption, CourseEnrollment, CourseRow } from "@/lib/api/courses";
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
@@ -31,6 +32,7 @@ const ROSTER_SORT_OPTIONS: { value: RosterSort; label: string }[] = [
 ];
 
 export function RosterTab({ enrollments, course, onMutate }: Props) {
+  const { has } = usePermissions();
   const [dropTarget, setDropTarget] = useState<CourseEnrollment | null>(null);
   const [transferTarget, setTransferTarget] = useState<CourseEnrollment | null>(null);
   const [pricingDetailId, setPricingDetailId] = useState<string | null>(null);
@@ -185,6 +187,29 @@ export function RosterTab({ enrollments, course, onMutate }: Props) {
                         <PricingItem label="报名来源" value={sourceLabel(e.source)} />
                         <PricingItem label="优惠说明" value={e.discount_reason || snapshotLabel(e.price_snapshot) || "无优惠"} />
                       </div>
+                      {e.status === "enrolled" && has("courses.pricing") && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const next = prompt(`设置 ${e.student_name} 的单独课时单价`, String(e.unit_price));
+                            if (next === null) return;
+                            const price = Number(next);
+                            if (!(price > 0)) return alert("课时单价必须大于 0");
+                            const reason = prompt("请填写调整单价的原因");
+                            if (reason === null) return;
+                            if (!reason.trim()) return alert("调整原因必填");
+                            try {
+                              await updateEnrollmentUnitPrice(e.enrollment_id, price, reason.trim());
+                              await onMutate();
+                            } catch (error) {
+                              alert((error as Error).message);
+                            }
+                          }}
+                          className="mt-3 inline-flex h-8 items-center rounded-md border border-brand-200 bg-white px-3 text-xs text-brand-700 hover:bg-brand-50"
+                        >
+                          编辑该学员单价
+                        </button>
+                      )}
                       {e.notes && <div className="mt-2 text-xs text-slate-500">报名备注：{e.notes}</div>}
                     </td>
                   </tr>

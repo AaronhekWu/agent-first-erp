@@ -4,13 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Archive, ArchiveRestore, BookOpen, Calendar, CheckCircle2, Trash2, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { requestApproval } from "@/lib/api/approvals-client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { CourseManageModal } from "./course-manage-modal";
 import type { CourseRow } from "@/lib/api/courses";
 import type { Department } from "@/lib/api/lookups";
 import { canCompleteCourse, getCourseLifecycle, lessonProgress, type CourseLifecycle } from "@/lib/course-lifecycle";
-import { setCompletedCourseArchived } from "@/lib/api/courses-client";
+import { completeCourse, deleteCourse, setCompletedCourseArchived } from "@/lib/api/courses-client";
+import { Gate } from "@/lib/auth/permissions-context";
 
 const STATUS: Record<CourseLifecycle, { label: string; cls: string; ring: string }> = {
   enrolling: { label: "招生中", cls: "bg-emerald-50 text-emerald-700", ring: "ring-emerald-200" },
@@ -33,22 +33,14 @@ export function CourseCard({ course, departments, initialOpen = false }: { cours
   const displayStatus = course.is_archived
     ? { label: "已归档", cls: "bg-slate-100 text-slate-600", ring: "ring-slate-200" }
     : st;
-  const submitCourseApproval = async (type: "archive" | "delete") => {
+  const runCourseAction = async (type: "archive" | "delete") => {
     const label = type === "archive" ? "结课" : "删除";
-    const reason = prompt(`请填写${label}课程「${course.course_name}」的审批原因`);
-    if (reason === null) return;
-    if (!reason.trim()) return alert("审批原因必填");
+    if (type === "delete" && !confirm(`确认删除课程「${course.course_name}」？历史报名会保留，但课程不再显示。`)) return;
     setBusy(type);
     try {
-      await requestApproval({
-        type: type === "archive" ? "course_archive" : "course_delete",
-        title: `${label}课程审批：${course.course_name}`,
-        reason: reason.trim(),
-        targetId: course.course_id,
-        targetLabel: course.course_name,
-        payload: { p_course_id: course.course_id, action: type },
-      });
-      alert(`已提交${label}课程审批`);
+      if (type === "archive") await completeCourse(course.course_id);
+      else await deleteCourse(course.course_id);
+      router.refresh();
     } catch (e) {
       alert((e as Error).message);
     } finally {
@@ -88,7 +80,7 @@ export function CourseCard({ course, departments, initialOpen = false }: { cours
                 )}
               </div>
             </div>
-            <span className={cn("rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset", displayStatus.cls, displayStatus.ring)}>
+            <span className={cn("shrink-0 whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset", displayStatus.cls, displayStatus.ring)}>
               {displayStatus.label}
             </span>
           </div>
@@ -150,7 +142,7 @@ export function CourseCard({ course, departments, initialOpen = false }: { cours
               {busy === "visibility" ? "处理中" : course.is_archived ? "取消归档" : "归档"}
             </button>
           ) : (
-            <>
+            <Gate keys="courses.archive">
               {(() => {
                 const completable = canCompleteCourse(course);
                 return (
@@ -158,7 +150,7 @@ export function CourseCard({ course, departments, initialOpen = false }: { cours
                     type="button"
                     disabled={busy !== null || !completable.ok}
                     title={completable.reason ?? undefined}
-                    onClick={() => submitCourseApproval("archive")}
+                    onClick={() => runCourseAction("archive")}
                     className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 px-2.5 text-xs text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <CheckCircle2 className="h-3.5 w-3.5" />
@@ -168,14 +160,15 @@ export function CourseCard({ course, departments, initialOpen = false }: { cours
               })()}
               <button
                 type="button"
-                disabled={busy !== null}
-                onClick={() => submitCourseApproval("delete")}
-                className="inline-flex h-8 items-center gap-1 rounded-md border border-red-100 bg-red-50 px-2.5 text-xs text-red-600 hover:bg-red-100 disabled:opacity-40"
+                disabled={busy !== null || filled > 0}
+                title={filled > 0 ? "请先将课程内学员全部退课或转课后再删除" : undefined}
+                onClick={() => runCourseAction("delete")}
+                className="inline-flex h-8 items-center gap-1 rounded-md border border-red-100 bg-red-50 px-2.5 text-xs text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 {busy === "delete" ? "提交中" : "删除"}
               </button>
-            </>
+            </Gate>
           )}
         </div>
       </div>

@@ -9,6 +9,7 @@ export type ApprovalType =
   | "enrollment_drop"
   | "enrollment_transfer"
   | "finance_refund"
+  | "finance_consume"
   | "finance_txn_delete"
   | "department_delete"
   | "staff_deactivate";
@@ -87,4 +88,14 @@ export async function reviewApproval(
     throw new Error(result.error || "审批执行失败，申请仍保持待审批状态");
   }
   return result;
+}
+
+export async function reverseApproval(id: string, reason: string) {
+  const sb = getSupabaseBrowser();
+  const { data, error } = await sb.rpc("rpc_reverse_approval", {
+    p_id: id,
+    p_reason: reason,
+  });
+  if (error) throw new Error(error.message);
+  return data;
 }

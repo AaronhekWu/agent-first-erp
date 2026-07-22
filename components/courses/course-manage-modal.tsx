@@ -65,6 +65,9 @@ export function CourseManageModal({ open, onClose, course, departments }: Props)
   if (!open) return null;
   const lifecycle = getCourseLifecycle(course);
   const enrollmentClosed = lifecycle === "full" || lifecycle === "ready_to_complete" || lifecycle === "completed";
+  const rosterEnrollments = enrollments.filter(
+    (enrollment) => enrollment.status === "enrolled" || enrollment.status === "completed",
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-slate-900/40 p-6">
@@ -133,7 +136,7 @@ export function CourseManageModal({ open, onClose, course, departments }: Props)
               {tab === "plan" && <CoursePlanTab course={course} departments={departments} canEdit={has("courses.plan") || has("courses.update")} onMutate={handleMutation} />}
               {tab === "roster" && (
                 <RosterTab
-                  enrollments={enrollments}
+                  enrollments={rosterEnrollments}
                   course={course}
                   onMutate={handleMutation}
                 />

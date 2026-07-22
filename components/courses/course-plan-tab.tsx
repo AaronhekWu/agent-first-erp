@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarRange, CheckCircle2, CircleDashed, Save } from "lucide-react";
+import { CalendarRange, CheckCircle2, ChevronDown, ChevronUp, CircleDashed, MapPin, Save } from "lucide-react";
 import { Field, inputCls } from "@/components/ui/form";
-import { updateCourseInfo } from "@/lib/api/courses-client";
+import { listCourseSessions, updateCourseInfo, type CourseSessionSummary } from "@/lib/api/courses-client";
 import { lessonProgress } from "@/lib/course-lifecycle";
 import { formatDate } from "@/lib/format";
 import type { CourseRow } from "@/lib/api/courses";
@@ -32,6 +32,8 @@ export function CoursePlanTab({ course, departments, canEdit, onMutate }: { cour
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [sessions, setSessions] = useState<CourseSessionSummary[]>([]);
 
   useEffect(() => {
     setTotalLessons(String(course.total_lessons ?? ""));
@@ -43,6 +45,10 @@ export function CoursePlanTab({ course, departments, canEdit, onMutate }: { cour
     setClassTime(course.schedule_info?.time ?? "");
     setTeacherName(course.schedule_info?.teacher_name ?? "");
   }, [course]);
+
+  useEffect(() => {
+    void listCourseSessions(course.course_id).then(setSessions).catch(() => setSessions([]));
+  }, [course.course_id, course.completed_sessions]);
 
   const toggleWeekday = (value: string) => {
     setWeekdays((current) => current.includes(value)
@@ -97,17 +103,45 @@ export function CoursePlanTab({ course, departments, canEdit, onMutate }: { cour
             {progress.total == null ? "设置计划课次后显示进度" : `${progress.completed} / ${progress.total}`}
           </span>
         </div>
-        <div className="mt-3 h-2 overflow-hidden rounded bg-slate-100">
-          <div className="h-full rounded bg-brand-500 transition-all" style={{ width: `${progress.percentage}%` }} />
+        <div className="relative mt-5 h-3 rounded-full bg-slate-100">
+          <div className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600 transition-all" style={{ width: `${progress.percentage}%` }} />
+          {sessions.map((session, index) => {
+            const denominator = Math.max(progress.total ?? sessions.length, 1);
+            const left = Math.min(100, Math.max(1, ((index + 1) / denominator) * 100));
+            return (
+              <span
+                key={session.class_date}
+                className="absolute top-1/2 grid h-5 w-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white bg-brand-600 text-white shadow"
+                style={{ left: `${left}%` }}
+                title={`${formatDate(session.class_date)} ${course.schedule_info?.time ?? ""} · 到课 ${session.attended}/${session.headcount} 人`}
+              >
+                <MapPin className="h-2.5 w-2.5" />
+              </span>
+            );
+          })}
         </div>
         <div className="mt-2 text-xs text-slate-500">
           课程周期：{course.start_date ? formatDate(course.start_date) : "未设置"} 至 {course.end_date ? formatDate(course.end_date) : "未设置"}
         </div>
+        {sessions.length > 0 && (
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+            {sessions.map((session, index) => (
+              <div key={session.class_date} className="shrink-0 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+                <div className="font-medium text-slate-700">第 {index + 1} 节 · {formatDate(session.class_date)}</div>
+                <div className="mt-0.5 text-slate-500">{course.schedule_info?.time || "时间未设"} · 到课 {session.attended}/{session.headcount} 人</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {course.status !== "archived" && canEdit && (
         <div className="rounded-lg border border-slate-200 p-4">
-          <h3 className="mb-4 text-sm font-medium text-slate-800">编辑课程信息</h3>
+          <button type="button" onClick={() => setExpanded((value) => !value)} className="flex w-full items-center justify-between text-sm font-medium text-slate-800">
+            <span>编辑课程信息</span>
+            {expanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+          </button>
+          {expanded && <div className="mt-4">
           <div className="grid gap-4 md:grid-cols-4">
             <Field label="计划总课次" required>
               <input type="number" min={Math.max(1, progress.completed)} step={1} className={inputCls} value={totalLessons} onChange={(event) => setTotalLessons(event.target.value)} />
@@ -161,6 +195,7 @@ export function CoursePlanTab({ course, departments, canEdit, onMutate }: { cour
               {saving ? "保存中" : "保存课程信息"}
             </button>
           </div>
+          </div>}
         </div>
       )}
       {course.status !== "archived" && !canEdit && (

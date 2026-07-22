@@ -102,6 +102,44 @@ export async function setCompletedCourseArchived(courseId: string, archived: boo
   return data;
 }
 
+export async function completeCourse(courseId: string) {
+  const sb = getSupabaseBrowser();
+  const { data, error } = await sb.rpc("rpc_complete_course", { p_course_id: courseId });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function deleteCourse(courseId: string) {
+  const sb = getSupabaseBrowser();
+  const { data, error } = await sb.rpc("rpc_delete_course", { p_course_id: courseId });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function updateEnrollmentUnitPrice(enrollmentId: string, unitPrice: number, reason: string) {
+  const sb = getSupabaseBrowser();
+  const { data, error } = await sb.rpc("rpc_update_enrollment_unit_price", {
+    p_enrollment_id: enrollmentId,
+    p_unit_price: unitPrice,
+    p_reason: reason,
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export interface CourseSessionSummary {
+  class_date: string;
+  headcount: number;
+  attended: number;
+}
+
+export async function listCourseSessions(courseId: string): Promise<CourseSessionSummary[]> {
+  const sb = getSupabaseBrowser();
+  const { data, error } = await sb.rpc("rpc_list_course_sessions", { p_course_id: courseId });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as CourseSessionSummary[];
+}
+
 export async function searchStudents(keyword: string, limit = 10): Promise<StudentSearchResult[]> {
   const sb = getSupabaseBrowser();
   const kw = `%${keyword}%`;

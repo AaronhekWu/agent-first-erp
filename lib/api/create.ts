@@ -44,6 +44,10 @@ export function reactivateStudent(input: { p_student_id: string; p_reason: strin
   return callRpc("rpc_reactivate_student", { ...input });
 }
 
+export function batchAssignStudents(input: { p_student_ids: string[]; p_counselor_id: string }) {
+  return callRpc("rpc_batch_assign_students", input);
+}
+
 // ============== 课程 ==============
 export interface CreateCourseInput {
   p_name: string;
@@ -78,6 +82,9 @@ export function upsertStaff(input: StaffInput) {
 }
 export function deleteStaff(p_id: string) {
   return callRpc("rpc_delete_staff", { p_id });
+}
+export function removeStaffFromDepartment(p_id: string) {
+  return callRpc("rpc_remove_staff_from_department", { p_id });
 }
 
 export interface DepartmentInput {

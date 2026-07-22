@@ -31,6 +31,7 @@ export interface CourseRow {
   is_archived: boolean;
   /** 在读报名的剩余课时合计 (可结课判定用) */
   enrolled_remaining_lessons: number;
+  unsettled_enrollment_count?: number;
   total_revenue: number;
   start_date: string | null;
   end_date: string | null;

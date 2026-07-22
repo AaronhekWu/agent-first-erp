@@ -27,6 +27,7 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
   const [keyword, setKeyword] = useState("");
   const [results, setResults] = useState<StudentSearchResult[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [selectedStudents, setSelectedStudents] = useState<Map<string, StudentSearchResult>>(new Map());
   const [plans, setPlans] = useState<CoursePricePlan[]>([]);
   const [campaigns, setCampaigns] = useState<EnrollmentCampaign[]>([]);
   const [mode, setMode] = useState<EnrollmentMode>("normal");
@@ -39,7 +40,10 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
-  const alreadyIn = new Set(enrollments.map((e) => e.student_id));
+  const alreadyIn = new Set(
+    enrollments.filter((enrollment) => enrollment.status === "enrolled" || enrollment.status === "completed")
+      .map((enrollment) => enrollment.student_id),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -99,32 +103,38 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
     setError(null);
   };
 
-  const handleEnroll = async (student: StudentSearchResult) => {
+  const validateEnrollment = () => {
     if (mode === "campaign" && !campaignId) {
-      setError("请选择有效的优惠组合");
-      return;
+      return "请选择有效的优惠组合";
     }
     if (mode === "custom" && (!(Number(customValue) > 0) || !discountReason.trim())) {
-      setError("请填写有效的优惠数值和优惠原因");
-      return;
+      return "请填写有效的优惠数值和优惠原因";
     }
+    return null;
+  };
+
+  const enrollOne = (student: StudentSearchResult) => enrollStudent({
+    p_student_id: student.id,
+    p_course_id: course.course_id,
+    p_source: mode,
+    p_price_id: priceId || null,
+    p_campaign_id: mode === "campaign" ? campaignId : null,
+    p_custom_discount_type: mode === "custom" ? customType : null,
+    p_custom_discount_value: mode === "custom" ? Number(customValue) : null,
+    p_discount_reason: mode === "custom" ? discountReason.trim() : null,
+    p_referrer_student_id: null,
+    p_lessons_override: lessonsOverride.trim() !== "" && Number(lessonsOverride) > 0 ? Number(lessonsOverride) : null,
+    p_notes: notes.trim() || null,
+  });
+
+  const handleEnroll = async (student: StudentSearchResult) => {
+    const validationError = validateEnrollment();
+    if (validationError) return setError(validationError);
     setBusyId(student.id);
     setError(null);
     setInfo(null);
     try {
-      await enrollStudent({
-        p_student_id: student.id,
-        p_course_id: course.course_id,
-        p_source: mode,
-        p_price_id: priceId || null,
-        p_campaign_id: mode === "campaign" ? campaignId : null,
-        p_custom_discount_type: mode === "custom" ? customType : null,
-        p_custom_discount_value: mode === "custom" ? Number(customValue) : null,
-        p_discount_reason: mode === "custom" ? discountReason.trim() : null,
-        p_referrer_student_id: null,
-        p_lessons_override: lessonsOverride.trim() !== "" && Number(lessonsOverride) > 0 ? Number(lessonsOverride) : null,
-        p_notes: notes.trim() || null,
-      });
+      await enrollOne(student);
       setInfo(`已为 ${student.name} 报课，应收 ${formatCurrency(quote.net)}，按实际上课逐节扣费`);
       setKeyword("");
       setResults([]);
@@ -134,6 +144,24 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
     } finally {
       setBusyId(null);
     }
+  };
+
+  const handleBatchEnroll = async () => {
+    const validationError = validateEnrollment();
+    if (validationError) return setError(validationError);
+    const students = [...selectedStudents.values()].filter((student) => !alreadyIn.has(student.id));
+    if (students.length === 0) return;
+    setBusyId("batch");
+    setError(null);
+    setInfo(null);
+    const outcomes = await Promise.allSettled(students.map(enrollOne));
+    const failed = outcomes.filter((outcome) => outcome.status === "rejected").length;
+    const succeeded = outcomes.length - failed;
+    setSelectedStudents(new Map());
+    setBusyId(null);
+    setInfo(`批量报名完成：成功 ${succeeded} 人${failed ? `，失败 ${failed} 人` : ""}`);
+    if (failed > 0) setError("部分学员报名失败，通常是欠费、重复报名或课程容量不足。请刷新后核对。");
+    if (succeeded > 0) await onMutate();
   };
 
   return (
@@ -202,7 +230,7 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
           <QuoteItem label="应收 / 实际课时单价" value={`${formatCurrency(quote.net)} / ${formatCurrency(quote.effectiveUnit)}`} strong />
         </div>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="报名备注（可选）" className="mt-3 min-h-14 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
-        <div className="mt-2 flex items-center gap-1 text-xs text-slate-500"><BadgePercent className="h-3.5 w-3.5" />报名仅锁定合同价格；余额将在实际到课时逐节扣除。余额为正可消课（本次可扣成负数），欠费后须先充值才能继续消课。</div>
+        <div className="mt-2 flex items-center gap-1 text-xs text-slate-500"><BadgePercent className="h-3.5 w-3.5" />报名仅锁定合同价格；现有课程会按实际上课持续扣费并允许余额/课时变负，系统会预警；已有负余额时不能再报名新课。</div>
         {error && <div className="mt-2 rounded bg-red-50 px-3 py-1.5 text-xs text-red-600">{error}</div>}
         {info && <div className="mt-2 rounded bg-emerald-50 px-3 py-1.5 text-xs text-emerald-700">{info}</div>}
       </div>
@@ -212,12 +240,30 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="按姓名 / 手机号 / 学员编号搜索报名学员" className="h-10 w-full rounded-md border border-slate-200 bg-white pl-10 pr-3 text-sm focus:border-brand-500 focus:outline-none" />
         </div>
+        {selectedStudents.size > 0 && (
+          <div className="mx-3 mb-3 flex items-center justify-between rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-700">
+            <span>已选择 {selectedStudents.size} 名学员</span>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setSelectedStudents(new Map())} className="text-xs hover:underline">清空</button>
+              <button
+                type="button"
+                disabled={busyId === "batch"}
+                onClick={handleBatchEnroll}
+                className="inline-flex h-8 items-center gap-1 rounded-md bg-brand-600 px-3 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                {busyId === "batch" ? "批量报名中…" : "批量确认报名"}
+              </button>
+            </div>
+          </div>
+        )}
         {!keyword.trim() && <div className="px-4 py-8 text-center text-sm text-slate-400">先确认上方价格，再搜索并选择学员</div>}
         {keyword.trim() && results.length === 0 && <div className="px-4 py-8 text-center text-sm text-slate-400">未找到匹配学员</div>}
         <ul className="divide-y divide-slate-100">
           {results.map((student) => {
             const duplicate = alreadyIn.has(student.id);
-            return <li key={student.id} className="flex items-center gap-3 px-4 py-2.5"><div className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-xs text-slate-500">{student.name.slice(0, 1)}</div><div className="min-w-0 flex-1"><div className="flex items-center gap-2 text-sm"><span className="font-medium text-slate-800">{student.name}</span><span className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] text-slate-500">{student.student_code ?? "无编号"}</span></div><div className="text-xs text-slate-500">{maskPhone(student.phone)} · {student.status}</div></div><button onClick={() => handleEnroll(student)} disabled={duplicate || busyId === student.id} className="inline-flex h-8 items-center gap-1 rounded-md bg-brand-600 px-3 text-xs font-medium text-white hover:bg-brand-700 disabled:bg-slate-300"><UserPlus className="h-3.5 w-3.5" />{duplicate ? "已报名" : busyId === student.id ? "报名中…" : `确认报名 ${formatCurrency(quote.net)}`}</button></li>;
+            const selected = selectedStudents.has(student.id);
+            return <li key={student.id} className="flex items-center gap-3 px-4 py-2.5"><input type="checkbox" checked={selected} disabled={duplicate} onChange={() => setSelectedStudents((current) => { const next = new Map(current); if (next.has(student.id)) next.delete(student.id); else next.set(student.id, student); return next; })} aria-label={`选择 ${student.name}`} /><div className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-xs text-slate-500">{student.name.slice(0, 1)}</div><div className="min-w-0 flex-1"><div className="flex items-center gap-2 text-sm"><span className="font-medium text-slate-800">{student.name}</span><span className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] text-slate-500">{student.student_code ?? "无编号"}</span></div><div className="text-xs text-slate-500">{maskPhone(student.phone)} · 在读</div></div><button onClick={() => handleEnroll(student)} disabled={duplicate || busyId !== null} className="inline-flex h-8 items-center gap-1 rounded-md bg-brand-600 px-3 text-xs font-medium text-white hover:bg-brand-700 disabled:bg-slate-300"><UserPlus className="h-3.5 w-3.5" />{duplicate ? "已报名" : busyId === student.id ? "报名中…" : `单独报名 ${formatCurrency(quote.net)}`}</button></li>;
           })}
         </ul>
       </div>

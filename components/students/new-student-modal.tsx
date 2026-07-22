@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { Field, inputCls, textareaCls } from "@/components/ui/form";
 import { PhoneInput } from "@/components/ui/phone-input";
-import { createStudent } from "@/lib/api/create";
+import { createStudent, enrollStudent } from "@/lib/api/create";
+import { listActiveCourseOptions } from "@/lib/api/courses-client";
+import type { ActiveCourseOption } from "@/lib/api/courses";
 import { isValidPhone } from "@/lib/format";
 import type { Counselor, Department } from "@/lib/api/students";
 
@@ -24,6 +26,7 @@ export function NewStudentModal({ open, onClose, counselors, departments }: Prop
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [gender, setGender] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [school, setSchool] = useState("");
   const [grade, setGrade] = useState("");
   const [source, setSource] = useState("");
@@ -33,20 +36,36 @@ export function NewStudentModal({ open, onClose, counselors, departments }: Prop
   const [parentPhone, setParentPhone] = useState("");
   const [parentRelation, setParentRelation] = useState("");
   const [notes, setNotes] = useState("");
+  const [courses, setCourses] = useState<ActiveCourseOption[]>([]);
+  const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
+  const teachingDepartmentId = useMemo(
+    () => departments.find((department) => department.name.trim() === "教学部")?.id ?? "",
+    [departments],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    if (!departmentId && teachingDepartmentId) setDepartmentId(teachingDepartmentId);
+    void listActiveCourseOptions()
+      .then(setCourses)
+      .catch((caught) => setError((caught as Error).message));
+  }, [open, departmentId, teachingDepartmentId]);
 
   const reset = () => {
     setName("");
     setPhone("");
     setGender("");
+    setBirthDate("");
     setSchool("");
     setGrade("");
     setSource("");
     setCounselorId("");
-    setDepartmentId("");
+    setDepartmentId(teachingDepartmentId);
     setParentName("");
     setParentPhone("");
     setParentRelation("");
     setNotes("");
+    setSelectedCourseIds([]);
     setError(null);
   };
 
@@ -66,10 +85,11 @@ export function NewStudentModal({ open, onClose, counselors, departments }: Prop
     setSubmitting(true);
     setError(null);
     try {
-      await createStudent({
+      const created = await createStudent({
         p_name: name.trim(),
         p_phone: phone.trim() || null,
         p_gender: gender || null,
+        p_birth_date: birthDate || null,
         p_school: school.trim() || null,
         p_grade: grade.trim() || null,
         p_source: source.trim() || null,
@@ -80,9 +100,23 @@ export function NewStudentModal({ open, onClose, counselors, departments }: Prop
         p_parent_relation: parentRelation || null,
         p_notes: notes.trim() || null,
       });
+      const studentId = (created as { student_id?: string } | null)?.student_id;
+      let failedEnrollments = 0;
+      if (studentId && selectedCourseIds.length > 0) {
+        const results = await Promise.allSettled(
+          selectedCourseIds.map((courseId) => enrollStudent({
+            p_student_id: studentId,
+            p_course_id: courseId,
+          })),
+        );
+        failedEnrollments = results.filter((result) => result.status === "rejected").length;
+      }
       reset();
       onClose();
       router.refresh();
+      if (failedEnrollments > 0) {
+        alert(`学员已创建，其中 ${failedEnrollments} 门课程报名失败，请到学员详情补录。`);
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -149,6 +183,15 @@ export function NewStudentModal({ open, onClose, counselors, departments }: Prop
             <option value="female">女</option>
           </select>
         </Field>
+        <Field label="出生日期">
+          <input
+            type="date"
+            max={new Date().toISOString().slice(0, 10)}
+            className={inputCls}
+            value={birthDate}
+            onChange={(e) => setBirthDate(e.target.value)}
+          />
+        </Field>
         <Field label="来源">
           <input
             className={inputCls}
@@ -192,8 +235,9 @@ export function NewStudentModal({ open, onClose, counselors, departments }: Prop
             className={inputCls}
             value={departmentId}
             onChange={(e) => setDepartmentId(e.target.value)}
+            disabled
           >
-            <option value="">未指定</option>
+            <option value="">教学部（系统统一）</option>
             {departments.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name}
@@ -240,6 +284,28 @@ export function NewStudentModal({ open, onClose, counselors, departments }: Prop
             onChange={(e) => setNotes(e.target.value)}
             placeholder="任何对顾问有帮助的信息"
           />
+        </Field>
+        <Field label="同时报名课程（可多选）" className="col-span-2">
+          <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-slate-200 p-2">
+            {courses.length === 0 ? (
+              <div className="px-2 py-4 text-center text-xs text-slate-400">暂无可报名课程</div>
+            ) : courses.map((course) => {
+              const checked = selectedCourseIds.includes(course.id);
+              return (
+                <label key={course.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-slate-50">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => setSelectedCourseIds((current) => checked
+                      ? current.filter((id) => id !== course.id)
+                      : [...current, course.id])}
+                  />
+                  <span className="font-medium text-slate-700">{course.name}</span>
+                  <span className="text-xs text-slate-400">{course.subject ?? "未设学科"} · {course.level ?? "未设年级"}</span>
+                </label>
+              );
+            })}
+          </div>
         </Field>
       </div>
     </Modal>
