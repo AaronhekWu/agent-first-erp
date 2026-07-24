@@ -3,10 +3,12 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Wallet, BookOpen, Phone, Calendar, User, FileText, GraduationCap } from "lucide-react";
 import { getStudentDetail } from "@/lib/api/student-detail";
 import { getStudentSignals } from "@/lib/api/signals";
+import { getLookups } from "@/lib/api/lookups";
 import { StatusBadge } from "@/components/students/status-badge";
 import { MonthCalendar } from "@/components/students/month-calendar";
 import { StudentSignalsCard } from "@/components/students/student-signals";
 import { TransactionLedger } from "@/components/students/transaction-ledger";
+import { StudentEditButton } from "@/components/students/student-edit-button";
 import {
   formatCurrency,
   formatDate,
@@ -21,14 +23,16 @@ interface Props {
 }
 
 export default async function StudentDetailPage({ params }: Props) {
-  const [detail, signals] = await Promise.all([
+  const [detail, signals, lookups] = await Promise.all([
     getStudentDetail(params.id),
     getStudentSignals(params.id).catch(() => null),
+    getLookups(),
   ]);
   if (!detail || !detail.student) notFound();
 
   const s = detail.student;
   const a = detail.account;
+  const parents = [...detail.parents].sort((left, right) => Number(Boolean(right.is_primary_contact)) - Number(Boolean(left.is_primary_contact)));
 
   // 课时汇总: 跨所有报名聚合
   const lessons = detail.enrollments.reduce(
@@ -81,10 +85,17 @@ export default async function StudentDetailPage({ params }: Props) {
                 创建于 {formatDate(s.created_at, true)} · 最近更新 {formatDate(s.updated_at, true)}
               </div>
             </div>
+            <StudentEditButton detail={detail} counselors={lookups.counselors} departments={lookups.departments} />
           </div>
 
           <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm md:grid-cols-3">
-            <InfoLine icon={Phone} label="手机号" value={maskPhone(s.phone)} />
+            <InfoLine
+              icon={Phone}
+              label="家长电话"
+              value={parents.length > 0
+                ? parents.map((parent) => maskPhone(parent.phone)).filter(Boolean).join(" / ")
+                : "未填写"}
+            />
             <InfoLine icon={User} label="性别" value={genderLabel(s.gender)} />
             <InfoLine
               icon={Calendar}

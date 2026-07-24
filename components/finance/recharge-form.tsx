@@ -10,11 +10,10 @@ import { formatCurrency } from "@/lib/format";
 import type { StudentSearchResult } from "@/lib/api/courses";
 
 const PAY_METHODS = [
-  { value: "wechat", label: "微信" },
-  { value: "alipay", label: "支付宝" },
+  { value: "shouqianba", label: "收钱吧" },
+  { value: "digital_wallet", label: "支付宝/微信" },
   { value: "cash", label: "现金" },
-  { value: "bank_transfer", label: "银行转账" },
-  { value: "other", label: "其他" },
+  { value: "corporate_transfer", label: "对公转账" },
 ];
 
 export function RechargeForm({ initialStudent = null }: { initialStudent?: StudentSearchResult | null }) {
@@ -23,7 +22,7 @@ export function RechargeForm({ initialStudent = null }: { initialStudent?: Stude
   const searchParams = useSearchParams();
   const [student, setStudent] = useState<StudentSearchResult | null>(initialStudent);
   const [amount, setAmount] = useState("");
-  const [method, setMethod] = useState("wechat");
+  const [method, setMethod] = useState("shouqianba");
   const [bonus, setBonus] = useState("0");
   const [ref, setRef] = useState("");
   const [notes, setNotes] = useState("");
@@ -45,7 +44,7 @@ export function RechargeForm({ initialStudent = null }: { initialStudent?: Stude
 
   const submit = async () => {
     if (!student) return setError("请选择学员");
-    const n = Number(amount);
+    const n = toMoney(Number(amount));
     if (!n || n <= 0) return setError("充值金额必须大于 0");
     setSubmitting(true);
     setError(null);
@@ -55,7 +54,7 @@ export function RechargeForm({ initialStudent = null }: { initialStudent?: Stude
         p_student_id: student.id,
         p_amount: n,
         p_payment_method: method,
-        p_bonus_amount: Number(bonus) || 0,
+        p_bonus_amount: toMoney(Number(bonus) || 0),
         p_payment_ref: ref.trim() || null,
         p_notes: notes.trim() || null,
       });
@@ -142,4 +141,8 @@ export function RechargeForm({ initialStudent = null }: { initialStudent?: Stude
       </button>
     </div>
   );
+}
+
+function toMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }

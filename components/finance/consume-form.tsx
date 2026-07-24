@@ -17,7 +17,6 @@ export function ConsumeForm() {
   const [enrollments, setEnrollments] = useState<ActiveEnrollment[]>([]);
   const [enrollmentId, setEnrollmentId] = useState("");
   const [lessons, setLessons] = useState("1");
-  const [unitPrice, setUnitPrice] = useState("");
   const [consumeDate, setConsumeDate] = useState(new Date().toISOString().slice(0, 10));
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -36,21 +35,14 @@ export function ConsumeForm() {
         setEnrollments(rows);
         if (rows[0]) {
           setEnrollmentId(rows[0].id);
-          setUnitPrice(String(rows[0].unit_price));
         } else {
           setEnrollmentId("");
-          setUnitPrice("");
         }
       } catch (e) {
         setError((e as Error).message);
       }
     })();
   }, [student]);
-
-  useEffect(() => {
-    const e = enrollments.find((x) => x.id === enrollmentId);
-    if (e) setUnitPrice(String(e.unit_price));
-  }, [enrollmentId, enrollments]);
 
   const submit = async () => {
     if (!student) return setError("请选择学员");
@@ -64,7 +56,7 @@ export function ConsumeForm() {
     setInfo(null);
     try {
       const enrollment = enrollments.find((item) => item.id === enrollmentId);
-      const amount = n * (Number(unitPrice) || Number(enrollment?.unit_price) || 0);
+      const amount = n * Number(enrollment?.unit_price ?? 0);
       await requestApproval({
         type: "finance_consume",
         title: `手动消课审批：${student.name}`,
@@ -75,7 +67,7 @@ export function ConsumeForm() {
         payload: {
           p_enrollment_id: enrollmentId,
           p_lesson_count: n,
-          p_unit_price: Number(unitPrice) || null,
+          p_unit_price: null,
           p_consume_date: consumeDate,
           p_reason: reason.trim(),
         },
@@ -116,7 +108,7 @@ export function ConsumeForm() {
           </select>
         </Field>
       )}
-      <div className="grid grid-cols-2 gap-4">
+      <div>
         <Field label="扣课时数" required>
           <input
             type="number"
@@ -124,16 +116,6 @@ export function ConsumeForm() {
             className={inputCls}
             value={lessons}
             onChange={(e) => setLessons(e.target.value)}
-          />
-        </Field>
-        <Field label="单价 (¥) 默认沿用">
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            className={inputCls}
-            value={unitPrice}
-            onChange={(e) => setUnitPrice(e.target.value)}
           />
         </Field>
       </div>

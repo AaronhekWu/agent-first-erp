@@ -20,6 +20,8 @@ export interface StudentDetail {
     notes?: string | null;
     counselor_name?: string | null;
     department_name?: string | null;
+    assigned_to?: string | null;
+    department_id?: string | null;
     created_at: string;
     updated_at: string;
   };
@@ -36,7 +38,8 @@ export interface StudentDetail {
     id: string;
     name?: string | null;
     phone?: string | null;
-    relation?: string | null;
+    relationship?: string | null;
+    is_primary_contact?: boolean | null;
   }>;
   enrollments: Array<{
     id: string;

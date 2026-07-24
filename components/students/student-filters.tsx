@@ -90,7 +90,7 @@ export function StudentFilters({
           <div className="relative">
             <input
               className={`${baseInputCls} pl-9`}
-              placeholder="姓名 / 手机号"
+              placeholder="姓名 / 家长电话"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && apply()}

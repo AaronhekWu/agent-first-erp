@@ -48,7 +48,7 @@ interface Props {
 
 const COLS: { key: string; label: string; w?: string; align?: string }[] = [
   { key: "name", label: "姓名", w: "w-24" },
-  { key: "phone", label: "手机号", w: "w-36" },
+  { key: "phone", label: "家长电话", w: "w-36" },
   { key: "status", label: "状态", w: "w-24" },
   { key: "school", label: "学校", w: "w-36" },
   { key: "grade", label: "年级", w: "w-16" },
@@ -121,7 +121,7 @@ export function StudentTable({ rows, counselors, total, page, pageSize, sort: ra
   const exportRows = (items: StudentRow[], label: string) => {
     const columns: Array<[string, (row: StudentRow) => unknown]> = [
       ["学员编号", (row) => row.student_code ?? ""], ["姓名", (row) => row.name],
-      ["手机号", (row) => row.phone ?? ""], ["状态", (row) => row.status],
+      ["家长电话", (row) => row.phone ?? ""], ["状态", (row) => row.status],
       ["学校", (row) => row.school ?? ""], ["年级", (row) => row.grade ?? ""],
       ["部门", (row) => row.department_name ?? ""], ["顾问", (row) => row.counselor_name ?? ""],
       ["余额", (row) => row.balance], ["在读课程", (row) => row.active_enrollment_count],

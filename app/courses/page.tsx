@@ -9,11 +9,13 @@ import { cn } from "@/lib/utils";
 import { getCourseLifecycle } from "@/lib/course-lifecycle";
 import { Gate } from "@/lib/auth/permissions-context";
 import { parseCourseSort, sortCourses } from "@/lib/list-sorting";
+import { DailyScheduleTimeline } from "@/components/courses/daily-schedule-timeline";
+import { localDate } from "@/lib/schedule";
 
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  searchParams: { page?: string; pageSize?: string; archived?: string; course?: string; sort?: string };
+  searchParams: { page?: string; pageSize?: string; archived?: string; course?: string; sort?: string; tab?: string; date?: string; scheduleDate?: string };
 }
 
 export default async function CoursesPage({ searchParams }: PageProps) {
@@ -38,6 +40,9 @@ export default async function CoursesPage({ searchParams }: PageProps) {
   const activeCount = displayCourses.filter((course) => getCourseLifecycle(course) === "enrolling").length;
   const enrolled = displayCourses.reduce((s, c) => s + c.active_enrolled, 0);
   const revenue = displayCourses.reduce((s, c) => s + Number(c.total_revenue ?? 0), 0);
+  const scheduleDate = /^\d{4}-\d{2}-\d{2}$/.test(searchParams.scheduleDate ?? "")
+    ? searchParams.scheduleDate!
+    : localDate(new Date());
 
   return (
     <div className="space-y-5 p-6">
@@ -76,6 +81,19 @@ export default async function CoursesPage({ searchParams }: PageProps) {
         <StatCard label="累计收入" value={formatCurrency(revenue)} Icon={Wallet} bg="bg-violet-50" color="text-violet-600" />
       </div>
 
+      {!showArchived && (
+        <div className="space-y-2">
+          <form className="flex justify-end gap-2" action="/courses">
+            <label className="flex items-center gap-2 text-xs text-slate-500">
+              日程日期
+              <input type="date" name="scheduleDate" defaultValue={scheduleDate} className="h-8 rounded border border-slate-200 bg-white px-2 text-xs" />
+            </label>
+            <button type="submit" className="h-8 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-600">查看</button>
+          </form>
+          <DailyScheduleTimeline courses={courses} date={scheduleDate} />
+        </div>
+      )}
+
       <CourseList
         courses={displayCourses}
         departments={departments}
@@ -83,6 +101,8 @@ export default async function CoursesPage({ searchParams }: PageProps) {
         pageSize={pageSize}
         emptyMessage={showArchived ? "暂无归档课程" : "暂无课程，点击右上角「新增课程」创建第一门课"}
         selectedCourseId={searchParams.course}
+        selectedTab={searchParams.tab}
+        selectedDate={searchParams.date}
         sort={sort}
       />
     </div>

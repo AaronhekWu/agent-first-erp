@@ -38,6 +38,8 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
   const [customValue, setCustomValue] = useState("");
   const [discountReason, setDiscountReason] = useState("");
   const [notes, setNotes] = useState("");
+  const [giftLessons, setGiftLessons] = useState("");
+  const [giftNote, setGiftNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const alreadyIn = new Set(
@@ -87,15 +89,17 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
     const gross = useOverride ? Math.round(perLesson * override * 100) / 100 : resolvedGross;
     const discountType = mode === "custom" ? customType : selectedCampaign?.discount_type;
     const discountValue = mode === "custom" ? Number(customValue || 0) : Number(selectedCampaign?.discount_value ?? 0);
-    const giftLessons = mode === "campaign" ? Number(selectedCampaign?.gift_lessons ?? 0) : 0;
+    const campaignGiftLessons = mode === "campaign" ? Number(selectedCampaign?.gift_lessons ?? 0) : 0;
+    const manualGiftLessons = Math.max(0, Number(giftLessons || 0));
     let discount = 0;
     if (discountType === "percentage" || discountType === "percent") discount = gross * discountValue / 100;
     if (discountType === "fixed" || discountType === "amount") discount = discountValue;
     discount = Math.max(0, Math.min(gross, discount));
     const net = Math.max(0, gross - discount);
-    const totalLessons = baseLessons + giftLessons;
-    return { listUnit, gross, discount, net, totalLessons, effectiveUnit: totalLessons > 0 ? net / totalLessons : 0, giftLessons };
-  }, [course.fee, course.total_lessons, customType, customValue, lessonsOverride, mode, selectedCampaign, selectedPlan]);
+    const totalGiftLessons = campaignGiftLessons + manualGiftLessons;
+    const totalLessons = baseLessons + totalGiftLessons;
+    return { listUnit, gross, discount, net, baseLessons, totalLessons, effectiveUnit: baseLessons > 0 ? net / baseLessons : 0, giftLessons: totalGiftLessons };
+  }, [course.fee, course.total_lessons, customType, customValue, giftLessons, lessonsOverride, mode, selectedCampaign, selectedPlan]);
 
   const chooseMode = (nextMode: EnrollmentMode) => {
     setMode(nextMode);
@@ -109,6 +113,9 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
     }
     if (mode === "custom" && (!(Number(customValue) > 0) || !discountReason.trim())) {
       return "请填写有效的优惠数值和优惠原因";
+    }
+    if (Number(giftLessons || 0) > 0 && !giftNote.trim()) {
+      return "赠送课时必须填写备注";
     }
     return null;
   };
@@ -124,6 +131,8 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
     p_discount_reason: mode === "custom" ? discountReason.trim() : null,
     p_referrer_student_id: null,
     p_lessons_override: lessonsOverride.trim() !== "" && Number(lessonsOverride) > 0 ? Number(lessonsOverride) : null,
+    p_gift_lessons: Number(giftLessons || 0) || 0,
+    p_gift_note: giftNote.trim() || null,
     p_notes: notes.trim() || null,
   });
 
@@ -224,10 +233,20 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
 
         <div className="mt-3 grid gap-3 rounded-md border border-slate-200 bg-white p-3 sm:grid-cols-5">
           <QuoteItem label="标准单价" value={formatCurrency(quote.listUnit)} />
-          <QuoteItem label="报名课时" value={`${quote.totalLessons} 节${quote.giftLessons ? `（赠 ${quote.giftLessons}）` : ""}`} />
+          <QuoteItem label="报名课时" value={`${quote.totalLessons} 节（正常 ${quote.baseLessons}${quote.giftLessons ? ` + 赠送 ${quote.giftLessons}` : ""}）`} />
           <QuoteItem label="原价" value={formatCurrency(quote.gross)} />
           <QuoteItem label="优惠" value={`-${formatCurrency(quote.discount)}`} accent={quote.discount > 0} />
           <QuoteItem label="应收 / 实际课时单价" value={`${formatCurrency(quote.net)} / ${formatCurrency(quote.effectiveUnit)}`} strong />
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="text-xs font-medium text-slate-600">
+            额外赠送课时
+            <input type="number" min="0" step="1" value={giftLessons} onChange={(event) => setGiftLessons(event.target.value)} className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm" placeholder="0" />
+          </label>
+          <label className="text-xs font-medium text-slate-600">
+            赠送备注 {Number(giftLessons || 0) > 0 && <span className="text-red-500">*</span>}
+            <input value={giftNote} onChange={(event) => setGiftNote(event.target.value)} className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm" placeholder="如：暑期报名赠送 2 课时" />
+          </label>
         </div>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="报名备注（可选）" className="mt-3 min-h-14 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
         <div className="mt-2 flex items-center gap-1 text-xs text-slate-500"><BadgePercent className="h-3.5 w-3.5" />报名仅锁定合同价格；现有课程会按实际上课持续扣费并允许余额/课时变负，系统会预警；已有负余额时不能再报名新课。</div>

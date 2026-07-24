@@ -19,6 +19,8 @@ interface Props {
   onClose: () => void;
   course: CourseRow;
   departments: Department[];
+  initialTab?: string;
+  initialDate?: string;
 }
 
 const TABS = [
@@ -30,11 +32,11 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-export function CourseManageModal({ open, onClose, course, departments }: Props) {
+export function CourseManageModal({ open, onClose, course, departments, initialTab, initialDate }: Props) {
   const { has } = usePermissions();
   const router = useRouter();
-  const [tab, setTab] = useState<TabKey>("plan");
-  const [classDate, setClassDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [tab, setTab] = useState<TabKey>(() => TABS.some((item) => item.key === initialTab) ? initialTab as TabKey : "plan");
+  const [classDate, setClassDate] = useState<string>(() => /^\d{4}-\d{2}-\d{2}$/.test(initialDate ?? "") ? initialDate! : new Date().toISOString().slice(0, 10));
   const [enrollments, setEnrollments] = useState<CourseEnrollment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

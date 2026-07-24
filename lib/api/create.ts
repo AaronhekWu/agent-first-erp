@@ -36,6 +36,26 @@ export function createStudent(input: CreateStudentInput) {
   return callRpc("rpc_create_student", { ...input });
 }
 
+export interface UpdateStudentInput {
+  p_student_id: string;
+  p_name: string;
+  p_gender?: string | null;
+  p_birth_date?: string | null;
+  p_school?: string | null;
+  p_grade?: string | null;
+  p_source?: string | null;
+  p_notes?: string | null;
+  p_assigned_to?: string | null;
+  p_department_id?: string | null;
+  p_parent_name?: string | null;
+  p_parent_relation?: string | null;
+  p_parent_phones?: string[];
+}
+
+export function updateStudent(input: UpdateStudentInput) {
+  return callRpc("rpc_update_student", { ...input });
+}
+
 export function graduateStudent(input: { p_student_id: string; p_graduated_at: string; p_note?: string | null }) {
   return callRpc("rpc_graduate_student", { ...input });
 }
@@ -163,9 +183,11 @@ export interface EnrollStudentInput {
   p_discount_reason?: string | null;
   p_referrer_student_id?: string | null;
   p_lessons_override?: number | null;
+  p_gift_lessons?: number | null;
+  p_gift_note?: string | null;
 }
 export function enrollStudent(input: EnrollStudentInput) {
-  return callRpc("rpc_enroll_student_v2", { ...input });
+  return callRpc("rpc_enroll_student_v3", { ...input });
 }
 
 export interface DropEnrollmentInput {

@@ -45,12 +45,24 @@ export interface MonthCalendarDay {
     status: "present" | "absent" | "late" | "leave";
     notes: string | null;
     marked_at: string;
+    consumption_count: number;
+    amount: number;
+    unit_price: number | null;
+    consumed_at: string | null;
+    operator_name: string | null;
   }>;
 }
 
 export interface MonthCalendar {
   year: number;
   month: number;
+  eligible_enrollments: Array<{
+    enrollment_id: string;
+    course_id: string;
+    course_name: string;
+    remaining_lessons: number | null;
+    unit_price: number | null;
+  }>;
   days: MonthCalendarDay[];
 }
 

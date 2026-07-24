@@ -127,6 +127,46 @@ export async function updateEnrollmentUnitPrice(enrollmentId: string, unitPrice:
   return data;
 }
 
+export async function addLessonLot(input: {
+  enrollmentId: string;
+  totalLessons: number;
+  unitPrice: number;
+  sourceType: "paid" | "transfer" | "gift" | "adjustment";
+  notes: string;
+  enrolledAt: string;
+}) {
+  const sb = getSupabaseBrowser();
+  const { data, error } = await sb.rpc("rpc_add_lesson_lot", {
+    p_enrollment_id: input.enrollmentId,
+    p_total_lessons: input.totalLessons,
+    p_unit_price: input.unitPrice,
+    p_source_type: input.sourceType,
+    p_notes: input.notes || null,
+    p_enrolled_at: new Date(`${input.enrolledAt}T12:00:00`).toISOString(),
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function updateLessonLot(input: {
+  lotId: string;
+  totalLessons: number;
+  unitPrice: number;
+  notes: string;
+  enrolledAt: string;
+}) {
+  const sb = getSupabaseBrowser();
+  const { data, error } = await sb.rpc("rpc_update_lesson_lot", {
+    p_lot_id: input.lotId,
+    p_total_lessons: input.totalLessons,
+    p_unit_price: input.unitPrice,
+    p_notes: input.notes || null,
+    p_enrolled_at: new Date(`${input.enrolledAt}T12:00:00`).toISOString(),
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 export interface CourseSessionSummary {
   class_date: string;
   headcount: number;

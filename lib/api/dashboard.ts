@@ -1,4 +1,5 @@
 import { createServerSupabase } from "@/lib/supabase/server";
+import { countScheduledPersonTimes, localDate, type SchedulableCourse } from "@/lib/schedule";
 
 // 角色化仪表盘 —— 全部走 createServerSupabase (以登录用户身份, RLS/security_invoker 视图
 // 自动按角色/部门收敛), 无需新增 RPC。
@@ -48,6 +49,13 @@ export interface DashboardAccess {
   audits: boolean;
 }
 
+export interface DashboardPeriod {
+  key: "half" | "month" | "quarter" | "year" | "custom";
+  from: string;
+  to: string;
+  label: string;
+}
+
 export type DashboardData =
   | {
       role: "admin";
@@ -57,12 +65,19 @@ export type DashboardData =
       approvalQueue: ApprovalBrief[];
       daily: DailyFlow[];
       graduated: number;
+      period: DashboardPeriod;
+      courses: SchedulableCourse[];
+      attendance: { expected: number; actual: number; ratio: number };
     }
   | { role: "counselor"; myStudents: number; pendingFollowups: number; lowBalanceCount: number; lowBalance: LowBalance[] }
   | { role: "teacher"; myClasses: number; classes: TeacherClass[] }
   | { role: "generic" };
 
-export async function getDashboard(role: string | null, permissions: string[] = []): Promise<DashboardData> {
+export async function getDashboard(
+  role: string | null,
+  permissions: string[] = [],
+  period: DashboardPeriod = resolveDashboardPeriod({ range: "month" }),
+): Promise<DashboardData> {
   const sb = createServerSupabase();
   const allowed = new Set(permissions);
   const isAdmin = role === "admin";
@@ -75,10 +90,9 @@ export async function getDashboard(role: string | null, permissions: string[] = 
   };
 
   if (isAdmin || permissions.length > 0) {
-    const since = new Date();
-    since.setDate(since.getDate() - 29);
-    since.setHours(0, 0, 0, 0);
-    const [summaryRes, apprRes, txRes, gradRes] = await Promise.all([
+    const since = new Date(`${period.from}T00:00:00`);
+    const until = new Date(`${period.to}T23:59:59.999`);
+    const [summaryRes, apprRes, txRes, gradRes, courseRes, attendanceRes] = await Promise.all([
       sb.rpc("rpc_get_dashboard_summary"),
       sb
         .from("aud_approvals")
@@ -89,19 +103,31 @@ export async function getDashboard(role: string | null, permissions: string[] = 
       sb
         .from("fin_transactions")
         .select("type,amount,created_at")
-        .in("type", ["recharge", "consume"])
+        .in("type", ["recharge", "consume", "refund"])
         .gte("created_at", since.toISOString())
-        .limit(10000),
+        .lte("created_at", until.toISOString())
+        .limit(50000),
       sb
         .from("stu_students")
         .select("id", { count: "exact", head: true })
         .eq("status", "graduated")
         .is("deleted_at", null),
+      sb
+        .from("v_course_stats")
+        .select("course_id,course_name,start_date,end_date,status,active_enrolled,schedule_info")
+        .eq("is_archived", false),
+      sb
+        .from("crs_attendance")
+        .select("id", { count: "exact", head: true })
+        .in("status", ["present", "late"])
+        .gte("class_date", period.from)
+        .lte("class_date", period.to),
     ]);
 
     // 逐日充值/消课 (本地日期), 补齐无交易的空白天
     const byDay = new Map<string, DailyFlow>();
-    for (let i = 0; i < 30; i++) {
+    const dayCount = Math.max(1, Math.round((until.getTime() - since.getTime()) / 86400000) + 1);
+    for (let i = 0; i < dayCount; i++) {
       const d = new Date(since);
       d.setDate(since.getDate() + i);
       const key = localDay(d);
@@ -111,17 +137,42 @@ export async function getDashboard(role: string | null, permissions: string[] = 
       const row = byDay.get(localDay(new Date(t.created_at)));
       if (!row) continue;
       if (t.type === "recharge") row.recharge += Number(t.amount);
-      else row.consume += Number(t.amount);
+      else if (t.type === "consume") row.consume += Number(t.amount);
+    }
+
+    const courses = (courseRes.data ?? []) as SchedulableCourse[];
+    const expected = countScheduledPersonTimes(courses, period.from, period.to);
+    const actual = attendanceRes.count ?? 0;
+    const txRows = (txRes.data ?? []) as { type: string; amount: number; created_at: string }[];
+    const finance = txRows.reduce((sum, transaction) => {
+      if (transaction.type === "recharge") sum.recharges += Number(transaction.amount);
+      if (transaction.type === "consume") sum.consumption += Number(transaction.amount);
+      if (transaction.type === "refund") sum.refunds += Number(transaction.amount);
+      return sum;
+    }, { recharges: 0, consumption: 0, refunds: 0 });
+    const summary = (summaryRes.data as DashSummary | null) ?? null;
+    if (summary) {
+      summary.period = { from: period.from, to: period.to };
+      summary.finance = {
+        recharges: finance.recharges,
+        consumption: finance.consumption,
+        refunds: finance.refunds,
+        net_revenue: finance.recharges - finance.refunds,
+      };
+      summary.monthly_revenue = groupMonthlyFlows(txRows);
     }
 
     return {
       role: "admin",
       access,
-      summary: (summaryRes.data as DashSummary | null) ?? null,
+      summary,
       pendingApprovals: apprRes.count ?? 0,
       approvalQueue: (apprRes.data ?? []) as ApprovalBrief[],
       daily: [...byDay.values()],
       graduated: gradRes.count ?? 0,
+      period,
+      courses,
+      attendance: { expected, actual, ratio: expected > 0 ? Math.round(actual / expected * 1000) / 10 : 0 },
     };
   }
 
@@ -193,4 +244,48 @@ export async function getDashboard(role: string | null, permissions: string[] = 
 function localDay(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function groupMonthlyFlows(rows: { type: string; amount: number; created_at: string }[]): DashSummary["monthly_revenue"] {
+  const groups = new Map<string, { month: string; recharge: number; consume: number; refund: number }>();
+  for (const row of rows) {
+    const month = localDay(new Date(row.created_at)).slice(0, 7);
+    const current = groups.get(month) ?? { month, recharge: 0, consume: 0, refund: 0 };
+    if (row.type === "recharge") current.recharge += Number(row.amount);
+    if (row.type === "consume") current.consume += Number(row.amount);
+    if (row.type === "refund") current.refund += Number(row.amount);
+    groups.set(month, current);
+  }
+  return [...groups.values()].sort((a, b) => a.month.localeCompare(b.month));
+}
+
+export function resolveDashboardPeriod(
+  input: { range?: string; from?: string; to?: string },
+  now = new Date(),
+): DashboardPeriod {
+  const range = input.range;
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const today = localDate(now);
+  if (range === "custom" && /^\d{4}-\d{2}-\d{2}$/.test(input.from ?? "") && /^\d{4}-\d{2}-\d{2}$/.test(input.to ?? "") && input.from! <= input.to!) {
+    return { key: "custom", from: input.from!, to: input.to!, label: `${input.from} 至 ${input.to}` };
+  }
+  if (range === "half") {
+    const firstHalf = now.getDate() <= 15;
+    const from = localDate(new Date(year, month, firstHalf ? 1 : 16));
+    const to = firstHalf ? localDate(new Date(year, month, 15)) : localDate(new Date(year, month + 1, 0));
+    return { key: "half", from, to, label: `${from} 至 ${to}` };
+  }
+  if (range === "quarter") {
+    const quarterStart = Math.floor(month / 3) * 3;
+    const from = localDate(new Date(year, quarterStart, 1));
+    const to = localDate(new Date(year, quarterStart + 3, 0));
+    return { key: "quarter", from, to, label: `${year} 年第 ${Math.floor(month / 3) + 1} 季度` };
+  }
+  if (range === "year") {
+    return { key: "year", from: `${year}-01-01`, to: `${year}-12-31`, label: `${year} 年` };
+  }
+  const from = localDate(new Date(year, month, 1));
+  const to = localDate(new Date(year, month + 1, 0));
+  return { key: "month", from, to, label: `${year} 年 ${month + 1} 月（截至 ${today}）` };
 }

@@ -63,6 +63,19 @@ export interface CourseEnrollment {
   today_attendance_id: string | null;
   today_status: string | null;
   enrolled_at: string;
+  lesson_lots: LessonLot[];
+}
+
+export interface LessonLot {
+  id: string;
+  source_type: "paid" | "transfer" | "gift" | "adjustment";
+  unit_price: number;
+  total_lessons: number;
+  consumed_lessons: number;
+  remaining_lessons: number;
+  total_amount: number;
+  notes: string | null;
+  enrolled_at: string;
 }
 
 export interface CoursePricePlan {

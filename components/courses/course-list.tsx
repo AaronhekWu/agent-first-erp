@@ -5,7 +5,7 @@ import type { Department } from "@/lib/api/lookups";
 import { COURSE_SORT_OPTIONS, type CourseSort } from "@/lib/list-sorting";
 import { UrlSortSelect } from "@/components/ui/url-sort-select";
 
-export function CourseList({ courses, departments, page, pageSize, emptyMessage, selectedCourseId, sort }: { courses: CourseRow[]; departments: Department[]; page: number; pageSize: number; emptyMessage: string; selectedCourseId?: string; sort: CourseSort }) {
+export function CourseList({ courses, departments, page, pageSize, emptyMessage, selectedCourseId, selectedTab, selectedDate, sort }: { courses: CourseRow[]; departments: Department[]; page: number; pageSize: number; emptyMessage: string; selectedCourseId?: string; selectedTab?: string; selectedDate?: string; sort: CourseSort }) {
   const totalPages = Math.max(1, Math.ceil(courses.length / pageSize));
   const selectedIndex = selectedCourseId ? courses.findIndex((course) => course.course_id === selectedCourseId) : -1;
   const currentPage = selectedIndex >= 0
@@ -27,7 +27,7 @@ export function CourseList({ courses, departments, page, pageSize, emptyMessage,
             {emptyMessage}
           </div>
         )}
-        {pagedCourses.map((course) => <CourseCard key={course.course_id} course={course} departments={departments} initialOpen={course.course_id === selectedCourseId} />)}
+        {pagedCourses.map((course) => <CourseCard key={course.course_id} course={course} departments={departments} initialOpen={course.course_id === selectedCourseId} initialTab={course.course_id === selectedCourseId ? selectedTab : undefined} initialDate={course.course_id === selectedCourseId ? selectedDate : undefined} />)}
       </div>
       <UrlListPagination page={currentPage} pageSize={pageSize} totalItems={courses.length} />
     </div>

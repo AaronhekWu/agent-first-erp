@@ -10,19 +10,27 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { getMe } from "@/lib/auth/me";
-import { getDashboard } from "@/lib/api/dashboard";
+import { getDashboard, resolveDashboardPeriod } from "@/lib/api/dashboard";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { PERMISSION_CATALOG, ROLE_DEFAULTS, ROLE_LABELS } from "@/lib/permissions";
+import { PeriodControl } from "@/components/dashboard/period-control";
+import { DailyScheduleTimeline } from "@/components/courses/daily-schedule-timeline";
+import { localDate } from "@/lib/schedule";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { range?: string; from?: string; to?: string };
+}) {
   const me = await getMe();
   const role = me?.user.primary_role ?? null;
   const permissions = role === "admin"
     ? PERMISSION_CATALOG.map((permission) => permission.key)
     : me?.permissions ?? (role ? ROLE_DEFAULTS[role] ?? [] : []);
-  const data = await getDashboard(role, permissions);
+  const period = resolveDashboardPeriod(searchParams);
+  const data = await getDashboard(role, permissions, period);
   const roleLabel = role ? ROLE_LABELS[role] ?? role : "访客";
 
   return (
@@ -35,6 +43,8 @@ export default async function DashboardPage() {
           {roleLabel} · 以下是与你职责相关的概览
         </p>
       </div>
+
+      <PeriodControl active={period.key} from={period.from} to={period.to} />
 
       {data.role === "admin" && <AdminView data={data} />}
       {data.role === "counselor" && <CounselorView data={data} />}
@@ -102,9 +112,9 @@ function AdminView({ data }: { data: Extract<Awaited<ReturnType<typeof getDashbo
   return (
     <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {data.access.finance && <Tile icon={Wallet} label="近30天充值" value={formatCurrency(s?.finance.recharges ?? 0)} tone="emerald" />}
-        {data.access.finance && <Tile icon={TrendingUp} label="近30天消课" value={formatCurrency(s?.finance.consumption ?? 0)} tone="blue" />}
-        {data.access.finance && <Tile icon={Wallet} label="近30天净收入" value={formatCurrency(s?.finance.net_revenue ?? 0)} tone="slate" />}
+        {data.access.finance && <Tile icon={Wallet} label={`${data.period.label}充值`} value={formatCurrency(s?.finance.recharges ?? 0)} tone="emerald" />}
+        {data.access.finance && <Tile icon={TrendingUp} label={`${data.period.label}消课`} value={formatCurrency(s?.finance.consumption ?? 0)} tone="blue" />}
+        {data.access.finance && <Tile icon={Wallet} label={`${data.period.label}净收入`} value={formatCurrency(s?.finance.net_revenue ?? 0)} tone="slate" />}
         {data.access.audits && <Tile icon={CheckSquare} label="待审批" value={data.pendingApprovals} sub="点击进入审批中心" tone={data.pendingApprovals > 0 ? "amber" : "slate"} href="/audits" />}
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
@@ -113,9 +123,18 @@ function AdminView({ data }: { data: Extract<Awaited<ReturnType<typeof getDashbo
         {data.access.followups && <Tile icon={Clock} label="待跟进" value={s?.followups.pending ?? 0} sub="点击进入跟进中心" href="/followups" />}
       </div>
 
+      {data.access.courses && (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <DailyScheduleTimeline courses={data.courses} date={localDate(new Date())} title="今日日常课程表" />
+          <Panel title={`${data.period.label}应消 / 实际课消人次`}>
+            <AttendanceCompletion expected={data.attendance.expected} actual={data.attendance.actual} ratio={data.attendance.ratio} />
+          </Panel>
+        </div>
+      )}
+
       {(data.access.finance || data.access.students) && <div className="grid gap-5 lg:grid-cols-3">
         {data.access.finance && <div className="lg:col-span-2">
-          <Panel title="近 30 天充值 / 消课趋势（各按峰值归一显示走势）">
+          <Panel title={`${data.period.label}充值 / 消课趋势（各按峰值归一显示走势）`}>
             <TrendChart daily={data.daily} />
           </Panel>
         </div>}
@@ -177,6 +196,24 @@ function AdminView({ data }: { data: Extract<Awaited<ReturnType<typeof getDashbo
   );
 }
 
+function AttendanceCompletion({ expected, actual, ratio }: { expected: number; actual: number; ratio: number }) {
+  const displayRatio = Math.max(0, Math.min(ratio, 100));
+  return (
+    <div className="space-y-5 px-5 py-6">
+      <div className="grid grid-cols-3 gap-3 text-center">
+        <div className="rounded-lg bg-slate-50 px-3 py-3"><div className="text-2xl font-semibold text-slate-800">{expected.toLocaleString("zh-CN")}</div><div className="mt-1 text-xs text-slate-500">应消人次</div></div>
+        <div className="rounded-lg bg-blue-50 px-3 py-3"><div className="text-2xl font-semibold text-blue-600">{actual.toLocaleString("zh-CN")}</div><div className="mt-1 text-xs text-slate-500">实际课消</div></div>
+        <div className="rounded-lg bg-emerald-50 px-3 py-3"><div className="text-2xl font-semibold text-emerald-600">{ratio}%</div><div className="mt-1 text-xs text-slate-500">完成占比</div></div>
+      </div>
+      <div>
+        <div className="mb-1.5 flex justify-between text-xs text-slate-500"><span>完成进度</span><span>{actual} / {expected}</span></div>
+        <div className="h-4 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-gradient-to-r from-blue-400 to-emerald-400 transition-all" style={{ width: `${displayRatio}%` }} /></div>
+      </div>
+      <p className="text-[11px] leading-5 text-slate-400">应消人次按所选时段内课程排期 × 当前在读人数计算；实际课消统计到课与迟到记录。</p>
+    </div>
+  );
+}
+
 /* ---------------- 图表 (纯 SVG, 服务端渲染) ---------------- */
 
 function TrendChart({ daily }: { daily: { day: string; recharge: number; consume: number }[] }) {
@@ -198,7 +235,7 @@ function TrendChart({ daily }: { daily: { day: string; recharge: number; consume
   const labelIdx = [0, Math.floor((n - 1) / 2), n - 1];
   return (
     <div className="px-5 py-4">
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="近30天充值与消课趋势">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="所选时段充值与消课趋势">
         {[0.25, 0.5, 0.75].map((r) => (
           <line key={r} x1={PAD.left} x2={W - PAD.right} y1={PAD.top + ih * r} y2={PAD.top + ih * r} stroke="#f1f5f9" strokeWidth="1" />
         ))}
