@@ -10,7 +10,9 @@ export type TxType =
   | "transfer_in"
   | "transfer_out"
   | "gift"
-  | "adjustment";
+  | "adjustment"
+  | "enrollment"
+  | "lesson_purchase";
 
 export interface Transaction {
   id: string;
@@ -35,6 +37,7 @@ export interface FinanceKpis {
   recharge_mtd: number;
   refund_mtd: number;
   consume_mtd: number;
+  course_fee_mtd: number;
   net_mtd: number;
 }
 
@@ -52,20 +55,32 @@ export async function getFinanceKpis(): Promise<FinanceKpis> {
   const sb = createServerSupabase();
   const { data, error } = await sb
     .from("fin_transactions")
-    .select("type, amount, created_at")
+    .select("type, amount, metadata, created_at")
     .gte("created_at", monthStartIso())
     .limit(10000);
   if (error) throw error;
   let r = 0,
     rf = 0,
-    c = 0;
-  for (const row of (data ?? []) as { type: string; amount: number }[]) {
+    c = 0,
+    courseFee = 0;
+  for (const row of (data ?? []) as { type: string; amount: number; metadata?: Record<string, unknown> | null }[]) {
     const n = Number(row.amount);
     if (row.type === "recharge") r += n;
     else if (row.type === "refund") rf += n;
     else if (row.type === "consume") c += n;
+    if (
+      row.type === "enrollment"
+      || row.type === "lesson_purchase"
+      || (row.type === "adjustment" && row.metadata?.domain === "course_contract")
+    ) courseFee += n;
   }
-  return { recharge_mtd: r, refund_mtd: rf, consume_mtd: c, net_mtd: r - rf };
+  return {
+    recharge_mtd: r,
+    refund_mtd: rf,
+    consume_mtd: c,
+    course_fee_mtd: courseFee,
+    net_mtd: r - rf,
+  };
 }
 
 export async function listTransactions(opts: {

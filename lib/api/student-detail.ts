@@ -1,4 +1,43 @@
 import { createServerSupabase } from "@/lib/supabase/server";
+import type { LessonLot } from "@/lib/api/courses";
+
+export interface StudentEnrollment {
+  id: string;
+  course_id: string;
+  course_name?: string | null;
+  subject?: string | null;
+  status: string;
+  source?: string | null;
+  original_enrollment_id?: string | null;
+  original_course_name?: string | null;
+  created_at: string;
+  enrolled_at?: string | null;
+  unit_price?: number | null;
+  list_unit_price?: number | null;
+  total_amount?: number | null;
+  gross_amount?: number | null;
+  discount_amount?: number | null;
+  discount_reason?: string | null;
+  total_lessons?: number | null;
+  consumed_lessons?: number | null;
+  remaining_lessons?: number | null;
+  notes?: string | null;
+  lesson_lots: LessonLot[];
+}
+
+export interface StudentEnrollmentEvent {
+  enrollment_id: string;
+  event_type: "enrollment" | "transfer";
+  event_at: string;
+  course_id: string;
+  course_name: string;
+  original_course_id?: string | null;
+  original_course_name?: string | null;
+  total_lessons?: number | null;
+  total_amount?: number | null;
+  status: string;
+  notes?: string | null;
+}
 
 export interface StudentDetail {
   student: {
@@ -41,16 +80,8 @@ export interface StudentDetail {
     relationship?: string | null;
     is_primary_contact?: boolean | null;
   }>;
-  enrollments: Array<{
-    id: string;
-    course_id: string;
-    course_name?: string | null;
-    status: string;
-    created_at: string;
-    total_lessons?: number | null;
-    consumed_lessons?: number | null;
-    remaining_lessons?: number | null;
-  }>;
+  enrollments: StudentEnrollment[];
+  enrollment_events: StudentEnrollmentEvent[];
   transactions: Array<{
     id: string;
     type: string;

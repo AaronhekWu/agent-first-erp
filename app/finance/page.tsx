@@ -1,4 +1,4 @@
-import { Wallet, Undo2, Minus, ListOrdered } from "lucide-react";
+import { Wallet, Undo2, Minus, ListOrdered, BookOpenCheck } from "lucide-react";
 import { getFinanceKpis, getRechargeStudent, listTransactions } from "@/lib/api/finance";
 import { Tabs } from "@/components/settings/tabs";
 import { RechargeForm } from "@/components/finance/recharge-form";
@@ -40,11 +40,12 @@ export default async function FinancePage({ searchParams }: PageProps) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         <KCard label="本月充值" value={kpis.recharge_mtd} Icon={Wallet} bg="bg-emerald-50" color="text-emerald-600" />
         <KCard label="本月退费" value={kpis.refund_mtd} Icon={Undo2} bg="bg-amber-50" color="text-amber-600" />
         <KCard label="本月消课" value={kpis.consume_mtd} Icon={Minus} bg="bg-red-50" color="text-red-500" />
-        <KCard label="本月净收入" value={kpis.net_mtd} Icon={ListOrdered} bg="bg-violet-50" color="text-violet-600" />
+        <KCard label="本月报课合同" value={kpis.course_fee_mtd} Icon={BookOpenCheck} bg="bg-blue-50" color="text-blue-600" />
+        <KCard label="本月现金净额" value={kpis.net_mtd} Icon={ListOrdered} bg="bg-violet-50" color="text-violet-600" />
       </div>
 
       <Tabs

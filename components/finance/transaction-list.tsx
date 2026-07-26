@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Download, Eye, Search, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -17,6 +17,8 @@ const TYPE_LABEL: Record<string, { label: string; cls: string }> = {
   transfer_out: { label: "转出", cls: "text-slate-600" },
   gift: { label: "赠送", cls: "text-violet-600" },
   adjustment: { label: "调整", cls: "text-slate-600" },
+  enrollment: { label: "课程报名", cls: "text-blue-600" },
+  lesson_purchase: { label: "课时付费", cls: "text-brand-600" },
 };
 
 export function TransactionList({ rows }: { rows: Transaction[] }) {
@@ -54,10 +56,16 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
         if (t.type === "recharge") acc.recharge += amount;
         if (t.type === "refund") acc.refund += amount;
         if (t.type === "consume") acc.consume += amount;
-        acc.net += t.type === "refund" || t.type === "consume" ? -amount : amount;
+        if (t.type === "recharge") acc.net += amount;
+        if (t.type === "refund") acc.net -= amount;
+        if (
+          t.type === "enrollment"
+          || t.type === "lesson_purchase"
+          || (t.type === "adjustment" && isCourseContractMetadata(t.metadata))
+        ) acc.courseFee += amount;
         return acc;
       },
-      { recharge: 0, refund: 0, consume: 0, net: 0 },
+      { recharge: 0, refund: 0, consume: 0, courseFee: 0, net: 0 },
     );
   }, [filtered]);
 
@@ -154,11 +162,12 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-5">
         <SummaryCard label="筛选充值" value={summary.recharge} tone="emerald" />
         <SummaryCard label="筛选退费" value={summary.refund} tone="amber" />
         <SummaryCard label="筛选消费" value={summary.consume} tone="red" />
-        <SummaryCard label="筛选净额" value={summary.net} tone="slate" />
+        <SummaryCard label="筛选报课合同" value={summary.courseFee} tone="blue" />
+        <SummaryCard label="筛选现金净额" value={summary.net} tone="slate" />
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-white">
@@ -192,9 +201,10 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
               {paged.map((t) => {
                 const meta = TYPE_LABEL[t.type] ?? { label: t.type, cls: "text-slate-700" };
                 const isOpen = expanded === t.id;
+                const lockedCourseEvent = isCourseContractMetadata(t.metadata);
                 return (
-                  <>
-                    <tr key={t.id} className="hover:bg-slate-50">
+                  <Fragment key={t.id}>
+                    <tr className="hover:bg-slate-50">
                       <td className="px-3 py-2 text-slate-600">{formatDate(t.created_at, true)}</td>
                       <td className="px-3 py-2"><span className={cn("font-medium", meta.cls)}>{meta.label}</span></td>
                       <td className="px-3 py-2 text-slate-700">
@@ -226,7 +236,7 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
                               <Info label="说明" value={t.description ?? "无备注"} />
                             </dl>
                             <div className="flex items-start justify-end">
-                              <Gate keys="finance.refund">
+                              {!lockedCourseEvent && <Gate keys="finance.refund">
                                 <button
                                   onClick={() => requestTxnDelete(t)}
                                   className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 px-3 text-xs font-medium text-red-600 hover:bg-red-50"
@@ -234,13 +244,18 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
                                   <Trash2 className="h-3.5 w-3.5" />
                                   删除流水（提交审批）
                                 </button>
-                              </Gate>
+                              </Gate>}
+                              {lockedCourseEvent && (
+                                <span className="rounded bg-blue-50 px-2.5 py-1.5 text-xs text-blue-600">
+                                  课程联动流水，请在课程记录中修改
+                                </span>
+                              )}
                             </div>
                           </div>
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>
@@ -270,11 +285,17 @@ function Info({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SummaryCard({ label, value, tone }: { label: string; value: number; tone: "emerald" | "amber" | "red" | "slate" }) {
+function isCourseContractMetadata(metadata: unknown): boolean {
+  return Boolean(metadata && typeof metadata === "object" && "domain" in metadata
+    && (metadata as { domain?: unknown }).domain === "course_contract");
+}
+
+function SummaryCard({ label, value, tone }: { label: string; value: number; tone: "emerald" | "amber" | "red" | "blue" | "slate" }) {
   const cls = {
     emerald: "text-emerald-600",
     amber: "text-amber-600",
     red: "text-red-500",
+    blue: "text-blue-600",
     slate: "text-slate-800",
   }[tone];
   return (

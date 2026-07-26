@@ -9,6 +9,7 @@ import { MonthCalendar } from "@/components/students/month-calendar";
 import { StudentSignalsCard } from "@/components/students/student-signals";
 import { TransactionLedger } from "@/components/students/transaction-ledger";
 import { StudentEditButton } from "@/components/students/student-edit-button";
+import { StudentEnrollmentHistory } from "@/components/students/student-enrollment-history";
 import {
   formatCurrency,
   formatDate,
@@ -127,40 +128,25 @@ export default async function StudentDetailPage({ params }: Props) {
 
           <div className="mt-5 border-t border-slate-100 pt-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
-              <BookOpen className="h-4 w-4 text-brand-500" />
-              报名记录 ({detail.enrollments.length})
+              <FileText className="h-4 w-4 text-blue-500" />
+              跟进记录 ({detail.followups.length})
             </div>
-            {detail.enrollments.length === 0 ? (
-              <div className="rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">暂无报名记录</div>
+            {detail.followups.length === 0 ? (
+              <div className="rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">暂无跟进记录</div>
             ) : (
-              <div className="overflow-x-auto rounded-lg border border-slate-100">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 text-xs text-slate-500">
-                    <tr>
-                      <th className="px-3 py-2 text-left">课程</th>
-                      <th className="px-3 py-2 text-left">状态</th>
-                      <th className="px-3 py-2 text-right">已消 / 总课时</th>
-                      <th className="px-3 py-2 text-left">报名时间</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {detail.enrollments.map((enrollment) => (
-                      <tr key={enrollment.id} className="hover:bg-slate-50">
-                        <td className="px-3 py-2">
-                          <Link href={`/courses?course=${enrollment.course_id}`} className="font-medium text-brand-600 hover:underline">
-                            {enrollment.course_name ?? "未知课程"}
-                          </Link>
-                        </td>
-                        <td className="px-3 py-2 text-slate-600">{enrollmentStatusLabel(enrollment.status)}</td>
-                        <td className="px-3 py-2 text-right text-slate-600">
-                          {enrollment.consumed_lessons ?? 0} / {enrollment.total_lessons ?? 0}
-                        </td>
-                        <td className="px-3 py-2 text-slate-600">{formatDate(enrollment.created_at)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <ul className="max-h-52 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-100">
+                {detail.followups.slice(0, 8).map((followup) => (
+                  <li key={followup.id} className="px-3 py-2.5">
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="rounded bg-blue-50 px-1.5 py-0.5 text-blue-700">{followupTypeLabel(followup.type)}</span>
+                      <span className="text-slate-600">{followup.creator_name ?? "未知"}</span>
+                      <span className="ml-auto text-slate-400">{formatDate(followup.created_at, true)}</span>
+                    </div>
+                    {followup.content && <div className="mt-1 line-clamp-2 text-sm text-slate-600">{followup.content}</div>}
+                    {followup.next_plan && <div className="mt-1 text-xs text-slate-400">下次计划：{followup.next_plan}{followup.next_date ? ` · ${formatDate(followup.next_date)}` : ""}</div>}
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         </div>
@@ -196,46 +182,13 @@ export default async function StudentDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* 跟进 */}
-      <div>
-        <Card title={`跟进记录 (${detail.followups.length})`}>
-          {detail.followups.length === 0 ? (
-            <EmptyHint text="暂无跟进记录" />
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {detail.followups.map((f) => (
-                <li key={f.id} className="px-1 py-3">
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="inline-flex rounded bg-blue-50 px-1.5 py-0.5 text-[11px] text-blue-700">
-                      {followupTypeLabel(f.type)}
-                    </span>
-                    <span className="text-slate-700">{f.creator_name ?? "未知"}</span>
-                    <span className="ml-auto text-xs text-slate-400">
-                      {formatDate(f.created_at, true)}
-                    </span>
-                  </div>
-                  {f.content && (
-                    <div className="mt-1 text-sm text-slate-600">{f.content}</div>
-                  )}
-                  {f.next_plan && (
-                    <div className="mt-1 text-xs text-slate-500">
-                      下次计划：{f.next_plan}
-                      {f.next_date && ` · ${formatDate(f.next_date)}`}
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      </div>
+      <StudentEnrollmentHistory enrollments={detail.enrollments} events={detail.enrollment_events ?? []} />
 
       {/* 交易台账（按类型/日期定位消课·充值·退费） */}
       <TransactionLedger transactions={detail.transactions} />
     </div>
   );
 }
-
 function genderLabel(g?: string | null): string {
   if (g === "male") return "男";
   if (g === "female") return "女";
@@ -250,15 +203,6 @@ function ageFromBirthDate(value: string): number {
     || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate());
   if (beforeBirthday) age -= 1;
   return Math.max(0, age);
-}
-
-function enrollmentStatusLabel(status: string): string {
-  return ({
-    enrolled: "在读",
-    completed: "已完成",
-    cancelled: "已退课",
-    transferred: "已转课",
-  } as Record<string, string>)[status] ?? "未知状态";
 }
 
 function InfoLine({
@@ -278,7 +222,6 @@ function InfoLine({
     </div>
   );
 }
-
 function KvRow({
   label,
   value,
@@ -323,19 +266,4 @@ function KvBox({
       </div>
     </div>
   );
-}
-
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl bg-white shadow-card">
-      <div className="border-b border-slate-100 px-5 py-3 text-sm font-medium text-slate-700">
-        {title}
-      </div>
-      <div className="overflow-x-auto">{children}</div>
-    </div>
-  );
-}
-
-function EmptyHint({ text }: { text: string }) {
-  return <div className="px-5 py-10 text-center text-sm text-slate-400">{text}</div>;
 }

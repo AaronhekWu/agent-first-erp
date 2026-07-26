@@ -320,6 +320,20 @@ function LessonLotManager({
       setSubmitting(false);
     }
   };
+  const editor = editingId ? (
+    <div className="grid gap-3 rounded-lg border border-brand-100 bg-brand-50/40 p-3 sm:grid-cols-2 lg:grid-cols-5">
+      <label className="text-[11px] text-slate-500">批次类型<select value={sourceType} disabled={editingId !== "new"} onChange={(event) => { const value = event.target.value as LessonLot["source_type"]; setSourceType(value); if (value === "gift") setPrice("0"); }} className="mt-1 h-9 w-full rounded border border-slate-200 bg-white px-2 text-xs"><option value="paid">正常付费</option><option value="transfer">转课带入</option><option value="gift">赠送</option><option value="adjustment">调整</option></select></label>
+      <label className="text-[11px] text-slate-500">总课时<input type="number" min={editing?.consumed_lessons ?? 1} step={1} value={lessons} onChange={(event) => setLessons(event.target.value)} className="mt-1 h-9 w-full rounded border border-slate-200 bg-white px-2 text-xs" /></label>
+      <label className="text-[11px] text-slate-500">实际单价<input type="number" min={0} step="0.01" disabled={sourceType === "gift"} value={price} onChange={(event) => setPrice(event.target.value)} className="mt-1 h-9 w-full rounded border border-slate-200 bg-white px-2 text-xs" /></label>
+      <label className="text-[11px] text-slate-500">报名日期<input type="date" value={enrolledAt} onChange={(event) => setEnrolledAt(event.target.value)} className="mt-1 h-9 w-full rounded border border-slate-200 bg-white px-2 text-xs" /></label>
+      <label className="text-[11px] text-slate-500">备注{sourceType === "gift" && <span className="text-red-500"> *</span>}<input value={note} onChange={(event) => setNote(event.target.value)} className="mt-1 h-9 w-full rounded border border-slate-200 bg-white px-2 text-xs" /></label>
+      <div className="flex items-center gap-2 sm:col-span-2 lg:col-span-5">
+        {error && <span className="mr-auto text-xs text-red-600">{error}</span>}
+        <button type="button" onClick={() => setEditingId(null)} className="ml-auto h-8 rounded border border-slate-200 bg-white px-3 text-xs">取消</button>
+        <button type="button" onClick={save} disabled={submitting} className="inline-flex h-8 items-center gap-1 rounded bg-brand-600 px-3 text-xs font-medium text-white disabled:opacity-50"><Save className="h-3 w-3" />{submitting ? "保存中" : "保存批次"}</button>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <div className="mt-4 border-t border-slate-200 pt-3">
@@ -342,33 +356,27 @@ function LessonLotManager({
           </thead>
           <tbody className="divide-y divide-slate-100">
             {enrollment.lesson_lots.map((lot) => (
-              <tr key={lot.id}>
-                <td className="px-2 py-2">{lotTypeLabel(lot.source_type)}</td>
-                <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(lot.unit_price)}</td>
-                <td className="px-2 py-2 text-center tabular-nums">{lot.consumed_lessons} / <span className="font-medium text-amber-600">{lot.remaining_lessons}</span> / {lot.total_lessons}</td>
-                <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(lot.total_amount)}</td>
-                <td className="px-2 py-2">{lot.enrolled_at.slice(0, 10)}</td>
-                <td className="max-w-56 truncate px-2 py-2 text-slate-500" title={lot.notes ?? ""}>{lot.notes || "—"}</td>
-                {canEdit && <td className="px-2 py-2 text-right"><button type="button" onClick={() => startEdit(lot)} className="text-brand-600 hover:underline">编辑</button></td>}
-              </tr>
+              <Fragment key={lot.id}>
+                <tr className={editingId === lot.id ? "bg-brand-50/30" : undefined}>
+                  <td className="px-2 py-2">{lotTypeLabel(lot.source_type)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(lot.unit_price)}</td>
+                  <td className="px-2 py-2 text-center tabular-nums">{lot.consumed_lessons} / <span className="font-medium text-amber-600">{lot.remaining_lessons}</span> / {lot.total_lessons}</td>
+                  <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(lot.total_amount)}</td>
+                  <td className="px-2 py-2">{lot.enrolled_at.slice(0, 10)}</td>
+                  <td className="max-w-56 truncate px-2 py-2 text-slate-500" title={lot.notes ?? ""}>{lot.notes || "—"}</td>
+                  {canEdit && <td className="px-2 py-2 text-right"><button type="button" onClick={() => startEdit(lot)} className="text-brand-600 hover:underline">编辑</button></td>}
+                </tr>
+                {editingId === lot.id && (
+                  <tr>
+                    <td colSpan={canEdit ? 7 : 6} className="bg-white px-2 py-2">{editor}</td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
           </tbody>
         </table>
       </div>
-      {editingId && (
-        <div className="mt-3 grid gap-3 rounded-lg border border-brand-100 bg-brand-50/40 p-3 sm:grid-cols-2 lg:grid-cols-5">
-          <label className="text-[11px] text-slate-500">批次类型<select value={sourceType} disabled={editingId !== "new"} onChange={(event) => { const value = event.target.value as LessonLot["source_type"]; setSourceType(value); if (value === "gift") setPrice("0"); }} className="mt-1 h-9 w-full rounded border border-slate-200 bg-white px-2 text-xs"><option value="paid">正常付费</option><option value="transfer">转课带入</option><option value="gift">赠送</option><option value="adjustment">调整</option></select></label>
-          <label className="text-[11px] text-slate-500">总课时<input type="number" min={editing?.consumed_lessons ?? 1} step={1} value={lessons} onChange={(event) => setLessons(event.target.value)} className="mt-1 h-9 w-full rounded border border-slate-200 bg-white px-2 text-xs" /></label>
-          <label className="text-[11px] text-slate-500">实际单价<input type="number" min={0} step="0.01" disabled={sourceType === "gift"} value={price} onChange={(event) => setPrice(event.target.value)} className="mt-1 h-9 w-full rounded border border-slate-200 bg-white px-2 text-xs" /></label>
-          <label className="text-[11px] text-slate-500">报名日期<input type="date" value={enrolledAt} onChange={(event) => setEnrolledAt(event.target.value)} className="mt-1 h-9 w-full rounded border border-slate-200 bg-white px-2 text-xs" /></label>
-          <label className="text-[11px] text-slate-500">备注{sourceType === "gift" && <span className="text-red-500"> *</span>}<input value={note} onChange={(event) => setNote(event.target.value)} className="mt-1 h-9 w-full rounded border border-slate-200 bg-white px-2 text-xs" /></label>
-          <div className="flex items-center gap-2 sm:col-span-2 lg:col-span-5">
-            {error && <span className="mr-auto text-xs text-red-600">{error}</span>}
-            <button type="button" onClick={() => setEditingId(null)} className="ml-auto h-8 rounded border border-slate-200 bg-white px-3 text-xs">取消</button>
-            <button type="button" onClick={save} disabled={submitting} className="inline-flex h-8 items-center gap-1 rounded bg-brand-600 px-3 text-xs font-medium text-white disabled:opacity-50"><Save className="h-3 w-3" />{submitting ? "保存中" : "保存批次"}</button>
-          </div>
-        </div>
-      )}
+      {editingId === "new" && <div className="mt-3">{editor}</div>}
     </div>
   );
 }

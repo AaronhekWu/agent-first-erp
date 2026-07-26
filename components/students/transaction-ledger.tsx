@@ -22,6 +22,8 @@ const TX_TYPE_LABEL: Record<string, string> = {
   transfer_out: "转出",
   gift: "赠送",
   adjustment: "调整",
+  enrollment: "课程报名",
+  lesson_purchase: "课时付费",
 };
 
 const TX_TYPE_CLS: Record<string, string> = {
@@ -32,6 +34,8 @@ const TX_TYPE_CLS: Record<string, string> = {
   transfer_out: "text-slate-600",
   gift: "text-violet-600",
   adjustment: "text-slate-600",
+  enrollment: "text-blue-600",
+  lesson_purchase: "text-brand-600",
 };
 
 // 快捷筛选组: 覆盖用户最常定位的三类记录
@@ -69,7 +73,7 @@ export function TransactionLedger({ transactions }: { transactions: LedgerTransa
     let outflow = 0;
     for (const t of filtered) {
       if (t.type === "consume" || t.type === "transfer_out") outflow += Number(t.amount);
-      else inflow += Number(t.amount);
+      else if (t.type === "recharge" || t.type === "transfer_in") inflow += Number(t.amount);
     }
     return { count: filtered.length, inflow, outflow };
   }, [filtered]);
