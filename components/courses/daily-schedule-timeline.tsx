@@ -25,12 +25,13 @@ export function DailyScheduleTimeline({
         ) : (
           <div className="relative space-y-0 before:absolute before:bottom-4 before:left-[4.45rem] before:top-4 before:w-px before:bg-slate-200">
             {events.map((event) => (
-              <div key={`${event.courseId}-${event.date}`} className="relative grid grid-cols-[4rem_1fr] gap-5 py-3">
-                <div className="pt-1 text-right text-sm font-semibold tabular-nums text-slate-700">{event.startTime}</div>
-                <span className="absolute left-[4.08rem] top-[1.15rem] z-10 h-3 w-3 rounded-full border-2 border-white bg-brand-500 shadow-sm" />
+              <div key={`${event.courseId}-${event.date}`} className="relative grid grid-cols-[4rem_1fr] items-center gap-5 py-3">
+                <div className="text-right text-sm font-semibold tabular-nums text-slate-700">{event.startTime}</div>
+                <span className="absolute left-[4.08rem] top-1/2 z-10 h-3 w-3 -translate-y-1/2 rounded-full border-2 border-white bg-brand-500 shadow-sm" />
                 <Link
                   href={`/courses?course=${event.courseId}&tab=attendance&date=${event.date}`}
-                  className="group rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 transition hover:border-brand-200 hover:bg-brand-50"
+                  className="group flex min-h-[84px] flex-col justify-center rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 transition hover:border-brand-200 hover:bg-brand-50"
+                  title={`进入「${event.courseName}」每日点名`}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div><div className="font-medium text-slate-800 group-hover:text-brand-700">{event.courseName}</div><div className="mt-1 text-xs text-slate-500">{event.teacherName}</div></div>

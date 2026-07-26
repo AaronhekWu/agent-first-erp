@@ -26,6 +26,10 @@ export function maskPhone(phone: string | null | undefined): string {
   return `${digits.slice(0, 3)}****${digits.slice(-4)}`;
 }
 
+export function displayPhone(phone: string | null | undefined): string {
+  return phone?.trim() || "未填写";
+}
+
 export function formatDate(
   iso: string | null | undefined,
   withTime = false,

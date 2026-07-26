@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Search, X } from "lucide-react";
 import { searchStudents } from "@/lib/api/courses-client";
 import type { StudentSearchResult } from "@/lib/api/courses";
-import { formatCurrency, maskPhone } from "@/lib/format";
+import { displayPhone, formatCurrency } from "@/lib/format";
 
 interface Props {
   value: StudentSearchResult | null;
@@ -41,7 +41,7 @@ export function StudentPicker({ value, onChange, placeholder }: Props) {
         <div>
           <div className="text-sm font-medium text-slate-800">{value.name}</div>
           <div className="text-xs text-slate-500">
-            {value.student_code ?? "无编号"} · {maskPhone(value.phone)} · 余额{" "}
+            {value.student_code ?? "无编号"} · {displayPhone(value.phone)} · 余额{" "}
             <span className={Number(value.balance ?? 0) < 0 ? "font-medium text-red-500" : "font-medium text-amber-600"}>
               {formatCurrency(Number(value.balance ?? 0))}
             </span>
@@ -85,7 +85,7 @@ export function StudentPicker({ value, onChange, placeholder }: Props) {
                 <div>
                   <div className="text-sm font-medium text-slate-800">{s.name}</div>
                   <div className="text-xs text-slate-500">
-                    {s.student_code ?? "无编号"} · {maskPhone(s.phone)}
+                    {s.student_code ?? "无编号"} · {displayPhone(s.phone)}
                   </div>
                 </div>
                 <span className={`text-xs font-medium tabular-nums ${Number(s.balance ?? 0) < 0 ? "text-red-500" : "text-amber-600"}`}>

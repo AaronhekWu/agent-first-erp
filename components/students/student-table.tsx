@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -25,7 +25,7 @@ import {
   formatCurrency,
   formatDate,
   followupTypeLabel,
-  maskPhone,
+  displayPhone,
 } from "@/lib/format";
 import { StatusBadge } from "./status-badge";
 import { StudentDrawer } from "./student-drawer";
@@ -46,21 +46,46 @@ interface Props {
   sort?: string;
 }
 
-const COLS: { key: string; label: string; w?: string; align?: string }[] = [
-  { key: "name", label: "姓名", w: "w-24" },
-  { key: "phone", label: "家长电话", w: "w-36" },
-  { key: "status", label: "状态", w: "w-24" },
-  { key: "school", label: "学校", w: "w-36" },
-  { key: "grade", label: "年级", w: "w-16" },
-  { key: "department_name", label: "部门", w: "w-32" },
-  { key: "counselor_name", label: "顾问", w: "w-24" },
-  { key: "balance", label: "余额", w: "w-32", align: "text-right" },
-  { key: "total_recharged", label: "累计充值", w: "w-36", align: "text-right" },
-  { key: "active_enrollment_count", label: "在读课程", w: "w-20", align: "text-center" },
-  { key: "last_followup_at", label: "最后跟进", w: "w-40" },
-  { key: "created_at", label: "创建时间", w: "w-32" },
-  { key: "action", label: "操作", w: "w-40", align: "text-left" },
+const COLS: { key: string; label: string; min: number; max: number; align?: string; fixed?: number }[] = [
+  { key: "name", label: "姓名", min: 88, max: 176 },
+  { key: "phone", label: "家长电话", min: 128, max: 240 },
+  { key: "status", label: "状态", min: 84, max: 112 },
+  { key: "school", label: "学校", min: 88, max: 240 },
+  { key: "grade", label: "年级", min: 80, max: 128 },
+  { key: "department_name", label: "部门", min: 88, max: 176 },
+  { key: "counselor_name", label: "顾问", min: 88, max: 160 },
+  { key: "balance", label: "余额", min: 112, max: 152, align: "text-right" },
+  { key: "total_recharged", label: "累计充值", min: 120, max: 168, align: "text-right" },
+  { key: "active_enrollment_count", label: "在读课程", min: 88, max: 112, align: "text-center" },
+  { key: "last_followup_at", label: "最后跟进", min: 160, max: 280 },
+  { key: "created_at", label: "创建时间", min: 148, max: 172 },
+  { key: "action", label: "操作", min: 152, max: 152, fixed: 152, align: "text-left" },
 ];
+
+function displayColumnValue(row: StudentRow, key: string): string {
+  switch (key) {
+    case "name": return row.name;
+    case "phone": return displayPhone(row.phone);
+    case "status": return row.status === "graduated" ? "已毕业" : "在读";
+    case "school": return row.school ?? "未填写";
+    case "grade": return row.grade ?? "未填写";
+    case "department_name": return row.department_name ?? "未分配";
+    case "counselor_name": return row.counselor_name ?? "未分配";
+    case "balance": return formatCurrency(row.balance);
+    case "total_recharged": return formatCurrency(row.total_recharged);
+    case "active_enrollment_count": return `${row.active_enrollment_count} 门`;
+    case "last_followup_at":
+      return row.last_followup_at
+        ? `${formatDate(row.last_followup_at, true)} · ${row.counselor_name ?? "未分配"} · ${followupTypeLabel(row.last_followup_type)}`
+        : "暂无跟进";
+    case "created_at": return formatDate(row.created_at, true);
+    default: return "";
+  }
+}
+
+function visualLength(value: string): number {
+  return Array.from(value).reduce((total, character) => total + (/[\u0000-\u00ff]/.test(character) ? 1 : 2), 0);
+}
 
 export function StudentTable({ rows, counselors, total, page, pageSize, sort: rawSort }: Props) {
   const router = useRouter();
@@ -73,6 +98,15 @@ export function StudentTable({ rows, counselors, total, page, pageSize, sort: ra
   const [batchTransferring, setBatchTransferring] = useState(false);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const sort = parseStudentSort(rawSort);
+  const columnWidths = useMemo(() => COLS.map((column) => {
+    if (column.fixed) return column.fixed;
+    const contentLength = rows.reduce(
+      (longest, row) => Math.max(longest, visualLength(displayColumnValue(row, column.key))),
+      visualLength(column.label),
+    );
+    return Math.min(column.max, Math.max(column.min, Math.ceil(contentLength * 7.5 + 32)));
+  }), [rows]);
+  const tableWidth = 48 + columnWidths.reduce((sum, width) => sum + width, 0);
 
   const allOnPageIds = useMemo(
     () => rows.filter((r) => r.status === "active").map((r) => r.id),
@@ -287,7 +321,13 @@ export function StudentTable({ rows, counselors, total, page, pageSize, sort: ra
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1550px] text-sm">
+        <table className="min-w-full table-fixed text-sm" style={{ width: `${tableWidth}px` }}>
+          <colgroup>
+            <col style={{ width: "48px" }} />
+            {COLS.map((column, index) => (
+              <col key={column.key} style={{ width: `${columnWidths[index]}px` }} />
+            ))}
+          </colgroup>
           <thead>
             <tr className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <th className="w-10 px-4 py-3">
@@ -310,7 +350,6 @@ export function StudentTable({ rows, counselors, total, page, pageSize, sort: ra
                   key={c.key}
                   className={cn(
                     "px-3 py-3 font-medium whitespace-nowrap",
-                    c.w,
                     c.align ?? "text-left",
                     // 操作列固定右侧, 与其他表头同层级
                     c.key === "action" && "sticky right-0 z-10 border-l border-slate-100 bg-slate-50",
@@ -360,53 +399,38 @@ export function StudentTable({ rows, counselors, total, page, pageSize, sort: ra
                     </button>
                   )}
                 </td>
-                <td className="px-3 py-3 font-medium text-slate-800">{r.name}</td>
-                <td className="px-3 py-3 text-slate-600">{maskPhone(r.phone)}</td>
-                <td className="px-3 py-3">
+                <td className="truncate whitespace-nowrap px-3 py-3 font-medium text-slate-800" title={r.name}>{r.name}</td>
+                <td className="truncate whitespace-nowrap px-3 py-3 text-slate-600" title={displayPhone(r.phone)}>{displayPhone(r.phone)}</td>
+                <td className="whitespace-nowrap px-3 py-3">
                   <StatusBadge status={r.status} />
                 </td>
-                <td className="px-3 py-3 text-slate-600">{r.school ?? "未填写"}</td>
-                <td className="px-3 py-3 text-slate-600">{r.grade ?? "未填写"}</td>
-                <td className="px-3 py-3 text-slate-600">
+                <td className="truncate whitespace-nowrap px-3 py-3 text-slate-600" title={r.school ?? "未填写"}>{r.school ?? "未填写"}</td>
+                <td className="whitespace-nowrap px-3 py-3 text-slate-600">{r.grade ?? "未填写"}</td>
+                <td className="truncate whitespace-nowrap px-3 py-3 text-slate-600" title={r.department_name ?? "未分配"}>
                   {r.department_name ?? "未分配"}
                 </td>
-                <td className="px-3 py-3 text-slate-600">
+                <td className="truncate whitespace-nowrap px-3 py-3 text-slate-600" title={r.counselor_name ?? "未分配"}>
                   {r.counselor_name ?? "未分配"}
                 </td>
                 <td
                   className={cn(
-                    "px-3 py-3 text-right tabular-nums",
+                    "whitespace-nowrap px-3 py-3 text-right tabular-nums",
                     Number(r.balance) < 0 ? "text-red-500" : "text-amber-600",
                   )}
                 >
                   {formatCurrency(r.balance)}
                 </td>
-                <td className="px-3 py-3 text-right tabular-nums text-slate-700">
+                <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-slate-700">
                   {formatCurrency(r.total_recharged)}
                 </td>
-                <td className="px-3 py-3 text-center text-slate-700">
+                <td className="whitespace-nowrap px-3 py-3 text-center text-slate-700">
                   {r.active_enrollment_count} 门
                 </td>
-                <td className="px-3 py-3 text-slate-600">
-                  {r.last_followup_at ? (
-                    <div className="leading-tight">
-                      <div>{formatDate(r.last_followup_at, true)}</div>
-                      <div className="text-xs text-slate-400">
-                        {r.counselor_name ?? "未分配"}{" "}
-                        {followupTypeLabel(r.last_followup_type)}
-                      </div>
-                    </div>
-                  ) : (
-                    "暂无跟进"
-                  )}
+                <td className="truncate whitespace-nowrap px-3 py-3 text-slate-600" title={displayColumnValue(r, "last_followup_at")}>
+                  {displayColumnValue(r, "last_followup_at")}
                 </td>
-                <td className="px-3 py-3 text-slate-600">
-                  <div className="leading-tight">
-                    <div>{formatDate(r.created_at, true).split(" ")[0]}</div>
-                    <div className="text-xs text-slate-400">
-                      {formatDate(r.created_at, true).split(" ")[1]}
-                    </div>
-                  </div>
+                <td className="whitespace-nowrap px-3 py-3 text-slate-600">
+                  {formatDate(r.created_at, true)}
                 </td>
                 <td
                   className={cn(

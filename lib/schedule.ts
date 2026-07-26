@@ -24,6 +24,24 @@ export interface CourseScheduleEvent {
 }
 
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+const TIME_RANGE_PATTERN = /([01]?\d|2[0-3]):([0-5]\d)\s*(?:-|—|–|~|～|至)\s*([01]?\d|2[0-3]):([0-5]\d)/;
+
+export function parseTimeRange(value: string | null | undefined): { start: string; end: string } {
+  const match = value?.match(TIME_RANGE_PATTERN);
+  if (!match) return { start: "", end: "" };
+  return {
+    start: `${match[1].padStart(2, "0")}:${match[2]}`,
+    end: `${match[3].padStart(2, "0")}:${match[4]}`,
+  };
+}
+
+export function formatTimeRange(start: string, end: string): string {
+  return start && end ? `${start}-${end}` : "";
+}
+
+export function isValidTimeRange(start: string, end: string): boolean {
+  return /^\d{2}:\d{2}$/.test(start) && /^\d{2}:\d{2}$/.test(end) && start < end;
+}
 
 export function courseEventsForDate(
   courses: SchedulableCourse[],
@@ -39,15 +57,17 @@ export function courseEventsForDate(
       return course.schedule_info?.weekdays?.includes(weekday);
     })
     .map((course) => {
-      const rawTime = course.schedule_info?.time?.trim() || "时间未设置";
-      const [startTime = "23:59", endTime = ""] = rawTime.split(/\s*[-—~至]\s*/);
+      const rawTime = course.schedule_info?.time?.trim() || "";
+      const parsedTime = parseTimeRange(rawTime);
+      const startTime = parsedTime.start || "23:59";
+      const endTime = parsedTime.end;
       return {
         courseId: course.course_id,
         courseName: course.course_name,
         date,
         startTime,
         endTime,
-        timeLabel: rawTime,
+        timeLabel: formatTimeRange(parsedTime.start, parsedTime.end) || rawTime || "时间未设置",
         teacherName: course.schedule_info?.teacher_name?.trim() || "老师未设置",
         headcount: Number(course.active_enrolled ?? 0),
       };

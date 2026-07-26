@@ -1,5 +1,5 @@
 import { createServerSupabase } from "@/lib/supabase/server";
-import { maskPhone } from "@/lib/format";
+import { displayPhone } from "@/lib/format";
 
 export type SearchKind = "student" | "course" | "staff" | "department";
 
@@ -146,7 +146,7 @@ export async function globalSearch(rawQuery: string, limitPerGroup = 8, offset =
         id: row.id,
         title: row.display_name,
         subtitle: [ROLE_LABEL[row.primary_role ?? ""] ?? row.primary_role, row.department_name].filter(Boolean).join(" · ") || "员工资料",
-        meta: row.phone ? maskPhone(row.phone) : row.email,
+        meta: row.phone ? displayPhone(row.phone) : row.email,
         href: `/campus?tab=staff&q=${encodeURIComponent(row.display_name)}`,
       })),
     },

@@ -171,6 +171,13 @@ export interface CourseSessionSummary {
   class_date: string;
   headcount: number;
   attended: number;
+  present: number;
+  late: number;
+  absent: number;
+  leave: number;
+  consumed_lessons: number;
+  consumed_amount: number;
+  student_names: string | null;
 }
 
 export async function listCourseSessions(courseId: string): Promise<CourseSessionSummary[]> {

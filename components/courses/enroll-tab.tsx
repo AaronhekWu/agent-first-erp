@@ -12,7 +12,7 @@ import type {
   EnrollmentCampaign,
   StudentSearchResult,
 } from "@/lib/api/courses";
-import { formatCurrency, maskPhone } from "@/lib/format";
+import { displayPhone, formatCurrency } from "@/lib/format";
 
 interface Props {
   course: CourseRow;
@@ -282,7 +282,7 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
           {results.map((student) => {
             const duplicate = alreadyIn.has(student.id);
             const selected = selectedStudents.has(student.id);
-            return <li key={student.id} className="flex items-center gap-3 px-4 py-2.5"><input type="checkbox" checked={selected} disabled={duplicate} onChange={() => setSelectedStudents((current) => { const next = new Map(current); if (next.has(student.id)) next.delete(student.id); else next.set(student.id, student); return next; })} aria-label={`选择 ${student.name}`} /><div className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-xs text-slate-500">{student.name.slice(0, 1)}</div><div className="min-w-0 flex-1"><div className="flex items-center gap-2 text-sm"><span className="font-medium text-slate-800">{student.name}</span><span className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] text-slate-500">{student.student_code ?? "无编号"}</span></div><div className="text-xs text-slate-500">{maskPhone(student.phone)} · 在读</div></div><button onClick={() => handleEnroll(student)} disabled={duplicate || busyId !== null} className="inline-flex h-8 items-center gap-1 rounded-md bg-brand-600 px-3 text-xs font-medium text-white hover:bg-brand-700 disabled:bg-slate-300"><UserPlus className="h-3.5 w-3.5" />{duplicate ? "已报名" : busyId === student.id ? "报名中…" : `单独报名 ${formatCurrency(quote.net)}`}</button></li>;
+            return <li key={student.id} className="flex items-center gap-3 px-4 py-2.5"><input type="checkbox" checked={selected} disabled={duplicate} onChange={() => setSelectedStudents((current) => { const next = new Map(current); if (next.has(student.id)) next.delete(student.id); else next.set(student.id, student); return next; })} aria-label={`选择 ${student.name}`} /><div className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-xs text-slate-500">{student.name.slice(0, 1)}</div><div className="min-w-0 flex-1"><div className="flex items-center gap-2 text-sm"><span className="font-medium text-slate-800">{student.name}</span><span className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] text-slate-500">{student.student_code ?? "无编号"}</span></div><div className="text-xs text-slate-500">{displayPhone(student.phone)} · 在读</div></div><button onClick={() => handleEnroll(student)} disabled={duplicate || busyId !== null} className="inline-flex h-8 items-center gap-1 rounded-md bg-brand-600 px-3 text-xs font-medium text-white hover:bg-brand-700 disabled:bg-slate-300"><UserPlus className="h-3.5 w-3.5" />{duplicate ? "已报名" : busyId === student.id ? "报名中…" : `单独报名 ${formatCurrency(quote.net)}`}</button></li>;
           })}
         </ul>
       </div>

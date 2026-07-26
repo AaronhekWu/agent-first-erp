@@ -41,6 +41,12 @@ export function CourseManageModal({ open, onClose, course, departments, initialT
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!open) return;
+    setTab(TABS.some((item) => item.key === initialTab) ? initialTab as TabKey : "plan");
+    setClassDate(/^\d{4}-\d{2}-\d{2}$/.test(initialDate ?? "") ? initialDate! : new Date().toISOString().slice(0, 10));
+  }, [open, initialTab, initialDate]);
+
   const reload = useCallback(async () => {
     if (!open) return;
     setLoading(true);

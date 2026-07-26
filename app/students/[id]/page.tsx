@@ -13,7 +13,7 @@ import {
   formatCurrency,
   formatDate,
   followupTypeLabel,
-  maskPhone,
+  displayPhone,
 } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +33,9 @@ export default async function StudentDetailPage({ params }: Props) {
   const s = detail.student;
   const a = detail.account;
   const parents = [...detail.parents].sort((left, right) => Number(Boolean(right.is_primary_contact)) - Number(Boolean(left.is_primary_contact)));
+  const parentPhones = parents
+    .map((parent) => parent.phone?.trim())
+    .filter((phone): phone is string => Boolean(phone));
 
   // 课时汇总: 跨所有报名聚合
   const lessons = detail.enrollments.reduce(
@@ -92,9 +95,7 @@ export default async function StudentDetailPage({ params }: Props) {
             <InfoLine
               icon={Phone}
               label="家长电话"
-              value={parents.length > 0
-                ? parents.map((parent) => maskPhone(parent.phone)).filter(Boolean).join(" / ")
-                : "未填写"}
+              value={parentPhones.length > 0 ? parentPhones.join(" / ") : displayPhone(s.phone)}
             />
             <InfoLine icon={User} label="性别" value={genderLabel(s.gender)} />
             <InfoLine

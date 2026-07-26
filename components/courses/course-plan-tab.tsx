@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { CalendarRange, CheckCircle2, ChevronDown, ChevronUp, CircleDashed, MapPin, Save } from "lucide-react";
 import { Field, inputCls } from "@/components/ui/form";
+import { TimeRangeInput } from "@/components/courses/time-range-input";
 import { listCourseSessions, updateCourseInfo, type CourseSessionSummary } from "@/lib/api/courses-client";
 import { lessonProgress } from "@/lib/course-lifecycle";
-import { formatDate } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
+import { formatTimeRange, isValidTimeRange, parseTimeRange } from "@/lib/schedule";
 import type { CourseRow } from "@/lib/api/courses";
 import type { Department } from "@/lib/api/lookups";
 
@@ -27,7 +29,9 @@ export function CoursePlanTab({ course, departments, canEdit, onMutate }: { cour
   const [endDate, setEndDate] = useState(course.end_date ?? "");
   const [departmentId, setDepartmentId] = useState(course.department_id ?? "");
   const [weekdays, setWeekdays] = useState<string[]>(course.schedule_info?.weekdays ?? []);
-  const [classTime, setClassTime] = useState(course.schedule_info?.time ?? "");
+  const initialTime = parseTimeRange(course.schedule_info?.time);
+  const [startTime, setStartTime] = useState(initialTime.start);
+  const [endTime, setEndTime] = useState(initialTime.end);
   const [teacherName, setTeacherName] = useState(course.schedule_info?.teacher_name ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +46,9 @@ export function CoursePlanTab({ course, departments, canEdit, onMutate }: { cour
     setEndDate(course.end_date ?? "");
     setDepartmentId(course.department_id ?? "");
     setWeekdays(course.schedule_info?.weekdays ?? []);
-    setClassTime(course.schedule_info?.time ?? "");
+    const nextTime = parseTimeRange(course.schedule_info?.time);
+    setStartTime(nextTime.start);
+    setEndTime(nextTime.end);
     setTeacherName(course.schedule_info?.teacher_name ?? "");
   }, [course]);
 
@@ -64,6 +70,7 @@ export function CoursePlanTab({ course, departments, canEdit, onMutate }: { cour
     if (price <= 0) return setError("标准课时单价必须大于 0");
     if (!startDate || !endDate) return setError("课程开始日期和结束日期必填");
     if (endDate < startDate) return setError("结束日期不能早于开始日期");
+    if (!isValidTimeRange(startTime, endTime)) return setError("请选择有效的开始和结束时间，结束时间必须晚于开始时间");
     setSaving(true);
     setError(null);
     setSaved(false);
@@ -76,7 +83,7 @@ export function CoursePlanTab({ course, departments, canEdit, onMutate }: { cour
         endDate,
         departmentId: departmentId || null,
         weekdays,
-        time: classTime.trim(),
+        time: formatTimeRange(startTime, endTime),
         teacherName: teacherName.trim(),
       });
       setSaved(true);
@@ -103,19 +110,37 @@ export function CoursePlanTab({ course, departments, canEdit, onMutate }: { cour
             {progress.total == null ? "设置计划课次后显示进度" : `${progress.completed} / ${progress.total}`}
           </span>
         </div>
-        <div className="relative mt-5 h-3 rounded-full bg-slate-100">
-          <div className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600 transition-all" style={{ width: `${progress.percentage}%` }} />
+        <div className="mt-3 flex items-center gap-4 text-[11px] text-slate-500">
+          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-5 rounded-full bg-emerald-500" />已完成</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-5 rounded-full bg-slate-200" />未完成</span>
+        </div>
+        <div className="relative mt-5 h-3 rounded-full bg-slate-200">
+          <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${progress.percentage}%` }} />
+          {progress.total != null && Array.from({ length: progress.total }, (_, index) => {
+            const left = ((index + 1) / Math.max(progress.total ?? 1, 1)) * 100;
+            return <span key={`planned-${index}`} className="pointer-events-none absolute top-1/2 h-4 w-px -translate-x-1/2 -translate-y-1/2 bg-white/80" style={{ left: `${left}%` }} />;
+          })}
           {sessions.map((session, index) => {
             const denominator = Math.max(progress.total ?? sessions.length, 1);
             const left = Math.min(100, Math.max(1, ((index + 1) / denominator) * 100));
+            const tooltipPosition = index === 0
+              ? "left-0"
+              : index === sessions.length - 1
+                ? "right-0"
+                : "left-1/2 -translate-x-1/2";
             return (
               <span
                 key={session.class_date}
-                className="absolute top-1/2 grid h-5 w-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white bg-brand-600 text-white shadow"
+                className="group absolute top-1/2 z-10 grid h-5 w-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white bg-emerald-600 text-white shadow"
                 style={{ left: `${left}%` }}
-                title={`${formatDate(session.class_date)} ${course.schedule_info?.time ?? ""} · 到课 ${session.attended}/${session.headcount} 人`}
               >
                 <MapPin className="h-2.5 w-2.5" />
+                <span className={`pointer-events-none absolute bottom-7 z-30 hidden w-64 rounded-lg bg-slate-900 p-3 text-left text-xs font-normal leading-5 text-white shadow-xl group-hover:block ${tooltipPosition}`}>
+                  <span className="block font-medium">{formatDate(session.class_date)} · {course.schedule_info?.time || "时间未设"}</span>
+                  <span className="mt-1 block text-slate-200">到课 {session.attended}/{session.headcount} 人（正常 {session.present ?? session.attended} · 迟到 {session.late ?? 0} · 缺席 {session.absent ?? 0} · 请假 {session.leave ?? 0}）</span>
+                  <span className="block text-slate-200">消课 {session.consumed_lessons ?? 0} 课时 · {formatCurrency(session.consumed_amount ?? 0)}</span>
+                  {session.student_names && <span className="mt-1 block border-t border-slate-700 pt-1 text-slate-300">记录：{session.student_names}</span>}
+                </span>
               </span>
             );
           })}
@@ -128,7 +153,7 @@ export function CoursePlanTab({ course, departments, canEdit, onMutate }: { cour
             {sessions.map((session, index) => (
               <div key={session.class_date} className="shrink-0 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
                 <div className="font-medium text-slate-700">第 {index + 1} 节 · {formatDate(session.class_date)}</div>
-                <div className="mt-0.5 text-slate-500">{course.schedule_info?.time || "时间未设"} · 到课 {session.attended}/{session.headcount} 人</div>
+                <div className="mt-0.5 text-slate-500">{course.schedule_info?.time || "时间未设"} · 到课 {session.attended}/{session.headcount} 人 · 消课 {session.consumed_lessons ?? 0} 课时</div>
               </div>
             ))}
           </div>
@@ -184,7 +209,14 @@ export function CoursePlanTab({ course, departments, canEdit, onMutate }: { cour
               </div>
             </Field>
             <Field label="上课时段" className="md:col-span-2">
-              <input className={inputCls} value={classTime} onChange={(event) => setClassTime(event.target.value)} placeholder="如 18:00-20:00" />
+              <TimeRangeInput
+                start={startTime}
+                end={endTime}
+                onChange={(nextStart, nextEnd) => {
+                  setStartTime(nextStart);
+                  setEndTime(nextEnd);
+                }}
+              />
             </Field>
           </div>
           <div className="mt-4 flex items-center justify-end gap-3">

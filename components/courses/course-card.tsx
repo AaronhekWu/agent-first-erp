@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Archive, ArchiveRestore, BookOpen, Calendar, CheckCircle2, Trash2, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -22,6 +22,7 @@ const STATUS: Record<CourseLifecycle, { label: string; cls: string; ring: string
 
 export function CourseCard({ course, departments, initialOpen = false, initialTab, initialDate }: { course: CourseRow; departments: Department[]; initialOpen?: boolean; initialTab?: string; initialDate?: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [open, setOpen] = useState(initialOpen);
   const [busy, setBusy] = useState<"archive" | "delete" | "visibility" | null>(null);
   const cap = course.max_capacity ?? 0;
@@ -30,6 +31,20 @@ export function CourseCard({ course, departments, initialOpen = false, initialTa
   const lifecycle = getCourseLifecycle(course);
   const st = STATUS[lifecycle];
   const progress = lessonProgress(course);
+  useEffect(() => {
+    if (initialOpen) setOpen(true);
+  }, [initialOpen, initialTab, initialDate]);
+
+  const closeModal = () => {
+    setOpen(false);
+    if (initialOpen) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("course");
+      params.delete("tab");
+      params.delete("date");
+      router.replace(params.size > 0 ? `/courses?${params.toString()}` : "/courses", { scroll: false });
+    }
+  };
   const displayStatus = course.is_archived
     ? { label: "已归档", cls: "bg-slate-100 text-slate-600", ring: "ring-slate-200" }
     : st;
@@ -172,7 +187,7 @@ export function CourseCard({ course, departments, initialOpen = false, initialTa
           )}
         </div>
       </div>
-      <CourseManageModal open={open} onClose={() => setOpen(false)} course={course} departments={departments} initialTab={initialTab} initialDate={initialDate} />
+      <CourseManageModal open={open} onClose={closeModal} course={course} departments={departments} initialTab={initialTab} initialDate={initialDate} />
     </>
   );
 }

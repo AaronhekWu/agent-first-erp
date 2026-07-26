@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { Field, inputCls, textareaCls } from "@/components/ui/form";
+import { TimeRangeInput } from "@/components/courses/time-range-input";
 import { createCourse, enrollStudent } from "@/lib/api/create";
 import { searchStudents } from "@/lib/api/courses-client";
+import { formatTimeRange, isValidTimeRange } from "@/lib/schedule";
 import type { StudentSearchResult } from "@/lib/api/courses";
 import type { Department } from "@/lib/api/students";
 
@@ -41,7 +43,8 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
   const [endDate, setEndDate] = useState("");
   const [departmentId, setDepartmentId] = useState("");
   const [days, setDays] = useState<string[]>([]);
-  const [time, setTime] = useState("18:00-20:00");
+  const [startTime, setStartTime] = useState("18:00");
+  const [endTime, setEndTime] = useState("20:00");
   const [teacherName, setTeacherName] = useState("");
   const [studentQuery, setStudentQuery] = useState("");
   const [studentResults, setStudentResults] = useState<StudentSearchResult[]>([]);
@@ -75,7 +78,8 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
     setEndDate("");
     setDepartmentId("");
     setDays([]);
-    setTime("18:00-20:00");
+    setStartTime("18:00");
+    setEndTime("20:00");
     setTeacherName("");
     setStudentQuery("");
     setStudentResults([]);
@@ -104,6 +108,10 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
       setError("结束日期不能早于开始日期");
       return;
     }
+    if (!isValidTimeRange(startTime, endTime)) {
+      setError("请选择有效的开始和结束时间，结束时间必须晚于开始时间");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -120,7 +128,7 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
         p_schedule_info: {
           total_lessons: Number(totalLessons),
           weekdays: days,
-          time: time.trim(),
+          time: formatTimeRange(startTime, endTime),
           teacher_name: teacherName.trim(),
         },
       });
@@ -340,11 +348,13 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
           </div>
         </Field>
         <Field label="上课时段" className="col-span-2">
-          <input
-            className={inputCls}
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-            placeholder="18:00-20:00"
+          <TimeRangeInput
+            start={startTime}
+            end={endTime}
+            onChange={(nextStart, nextEnd) => {
+              setStartTime(nextStart);
+              setEndTime(nextEnd);
+            }}
           />
         </Field>
         <Field label="课程描述" className="col-span-2">

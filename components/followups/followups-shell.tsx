@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Plus, Sparkles, AlertTriangle, ChevronRight, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { formatCurrency, formatDate, followupTypeLabel, maskPhone } from "@/lib/format";
+import { displayPhone, formatCurrency, formatDate, followupTypeLabel } from "@/lib/format";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { NewFollowupModal } from "./new-followup-modal";
 import type { FollowupItem, FollowupOverview } from "@/lib/api/followups";
@@ -221,7 +221,7 @@ export function FollowupsShell({ overview }: Props) {
                       {f.result && <span>结果：{f.result}</span>}
                       {f.next_plan && <span>下次计划：{f.next_plan}</span>}
                       {f.next_date && <span>下次时间：{formatDate(f.next_date, true)}</span>}
-                      {f.student_phone && <span>电话：{maskPhone(f.student_phone)}</span>}
+                      {f.student_phone && <span>电话：{displayPhone(f.student_phone)}</span>}
                     </div>
                   </div>
                 </li>
