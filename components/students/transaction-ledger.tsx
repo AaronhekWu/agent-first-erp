@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { CalendarSearch, X } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { financeTransactionLabel } from "@/lib/finance-display";
 
 export interface LedgerTransaction {
   id: string;
@@ -21,7 +22,7 @@ const TX_TYPE_LABEL: Record<string, string> = {
   transfer_in: "转入",
   transfer_out: "转出",
   gift: "赠送",
-  adjustment: "调整",
+  adjustment: "账务调整",
   enrollment: "课程报名",
   lesson_purchase: "课时付费",
 };
@@ -165,7 +166,7 @@ export function TransactionLedger({ transactions }: { transactions: LedgerTransa
                   <td className="px-3 py-2 text-slate-600">{formatDate(t.created_at, true)}</td>
                   <td className="px-3 py-2">
                     <span className={`text-sm font-medium ${TX_TYPE_CLS[t.type] ?? "text-slate-700"}`}>
-                      {TX_TYPE_LABEL[t.type] ?? t.type}
+                      {TX_TYPE_LABEL[t.type] ?? financeTransactionLabel(t.type)}
                     </span>
                   </td>
                   <td className="px-3 py-2 text-slate-600">{t.description ?? "无备注"}</td>

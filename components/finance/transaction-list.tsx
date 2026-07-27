@@ -8,15 +8,20 @@ import type { Transaction, TxType } from "@/lib/api/finance";
 import { ListPagination } from "@/components/ui/list-pagination";
 import { Gate } from "@/lib/auth/permissions-context";
 import { requestApproval } from "@/lib/api/approvals-client";
+import {
+  financeReferenceLabel,
+  financeTransactionLabel,
+  shortRecordId,
+} from "@/lib/finance-display";
 
 const TYPE_LABEL: Record<string, { label: string; cls: string }> = {
   recharge: { label: "充值", cls: "text-emerald-600" },
-  consume: { label: "消费", cls: "text-red-500" },
+  consume: { label: "消课", cls: "text-red-500" },
   refund: { label: "退费", cls: "text-amber-600" },
   transfer_in: { label: "转入", cls: "text-emerald-600" },
   transfer_out: { label: "转出", cls: "text-slate-600" },
   gift: { label: "赠送", cls: "text-violet-600" },
-  adjustment: { label: "调整", cls: "text-slate-600" },
+  adjustment: { label: "账务调整", cls: "text-slate-600" },
   enrollment: { label: "课程报名", cls: "text-blue-600" },
   lesson_purchase: { label: "课时付费", cls: "text-brand-600" },
 };
@@ -52,6 +57,7 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
   const summary = useMemo(() => {
     return filtered.reduce(
       (acc, t) => {
+        if (isVoidedMetadata(t.metadata)) return acc;
         const amount = Number(t.amount) || 0;
         if (t.type === "recharge") acc.recharge += amount;
         if (t.type === "refund") acc.refund += amount;
@@ -79,21 +85,21 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
   };
 
   const requestTxnDelete = async (t: Transaction) => {
-    const label = TYPE_LABEL[t.type]?.label ?? t.type;
-    const reason = prompt(`请填写删除该流水（${label} ${formatCurrency(t.amount)}）的审批原因`);
+    const label = financeTransactionLabel(t.type);
+    const reason = prompt(`请填写撤销该流水（${label} ${formatCurrency(t.amount)}）的审批原因`);
     if (reason === null) return;
     if (!reason.trim()) return alert("审批原因必填");
     try {
       await requestApproval({
         type: "finance_txn_delete",
-        title: `删除流水审批：${t.student_name ?? ""} ${label} ${formatCurrency(t.amount)}`,
+        title: `撤销流水审批：${t.student_name ?? ""} ${label} ${formatCurrency(t.amount)}`,
         reason: reason.trim(),
         targetId: t.id,
         targetLabel: t.student_name ?? t.description ?? "流水",
         amount: t.amount,
         payload: { p_txn_id: t.id },
       });
-      alert("已提交删除流水审批。管理员通过后将反转账户余额并删除该记录。");
+      alert("已提交流水撤销审批。管理员通过后会生成反向账务记录，原流水保留并标记为已撤销。");
     } catch (e) {
       alert((e as Error).message);
     }
@@ -104,7 +110,7 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
     const lines = filtered.map((t) =>
       [
         formatDate(t.created_at, true),
-        TYPE_LABEL[t.type]?.label ?? t.type,
+        financeTransactionLabel(t.type),
         t.student_name ?? "",
         t.student_code ?? "",
         t.description ?? "",
@@ -121,7 +127,7 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `finance-transactions-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `财务流水-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -199,14 +205,21 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
                 </tr>
               )}
               {paged.map((t) => {
-                const meta = TYPE_LABEL[t.type] ?? { label: t.type, cls: "text-slate-700" };
+                const meta = TYPE_LABEL[t.type] ?? { label: financeTransactionLabel(t.type), cls: "text-slate-700" };
                 const isOpen = expanded === t.id;
                 const lockedCourseEvent = isCourseContractMetadata(t.metadata);
+                const voided = isVoidedMetadata(t.metadata);
+                const balanceDisplay = lockedCourseEvent
+                  ? "不影响钱包余额"
+                  : `${formatCurrency(t.balance_before)} → ${formatCurrency(t.balance_after)}`;
                 return (
                   <Fragment key={t.id}>
                     <tr className="hover:bg-slate-50">
                       <td className="px-3 py-2 text-slate-600">{formatDate(t.created_at, true)}</td>
-                      <td className="px-3 py-2"><span className={cn("font-medium", meta.cls)}>{meta.label}</span></td>
+                      <td className="px-3 py-2">
+                        <span className={cn("font-medium", meta.cls)}>{meta.label}</span>
+                        {voided && <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500">已撤销</span>}
+                      </td>
                       <td className="px-3 py-2 text-slate-700">
                         {t.student_name ?? "未知学员"}
                         {t.student_code && <span className="ml-1 font-mono text-[11px] text-slate-400">{t.student_code}</span>}
@@ -214,7 +227,9 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
                       <td className="px-3 py-2 text-slate-600">{t.description ?? "无备注"}</td>
                       <td className={cn("px-3 py-2 text-right tabular-nums", meta.cls)}>{formatCurrency(t.amount)}</td>
                       <td className="px-3 py-2 text-right tabular-nums text-slate-500">
-                        {formatCurrency(t.balance_before)} → <span className="text-slate-800">{formatCurrency(t.balance_after)}</span>
+                        {lockedCourseEvent
+                          ? <span className="text-blue-600">不影响钱包余额</span>
+                          : <>{formatCurrency(t.balance_before)} → <span className="text-slate-800">{formatCurrency(t.balance_after)}</span></>}
                       </td>
                       <td className="px-3 py-2 text-right">
                         <button onClick={() => setExpanded(isOpen ? null : t.id)} className="inline-flex h-7 items-center gap-1 rounded border border-slate-200 px-2 text-xs text-slate-600 hover:bg-slate-50">
@@ -231,18 +246,23 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
                               <Info label="发起人" value={t.created_by_name ?? "系统"} />
                               <Info label="发起时间" value={formatDate(t.created_at, true)} />
                               <Info label="学员" value={`${t.student_name ?? "未知学员"}${t.student_code ? ` (${t.student_code})` : ""}`} />
-                              <Info label="关联" value={t.reference_type ? `${t.reference_type}${t.reference_id ? ` · ${t.reference_id}` : ""}` : "无"} />
-                              <Info label="余额变化" value={`${formatCurrency(t.balance_before)} → ${formatCurrency(t.balance_after)}`} />
+                              <Info
+                                label="关联"
+                                value={t.reference_type
+                                  ? `${financeReferenceLabel(t.reference_type)}${t.reference_id ? ` · 记录号 ${shortRecordId(t.reference_id)}` : ""}`
+                                  : "无"}
+                              />
+                              <Info label="余额变化" value={balanceDisplay} />
                               <Info label="说明" value={t.description ?? "无备注"} />
                             </dl>
                             <div className="flex items-start justify-end">
-                              {!lockedCourseEvent && <Gate keys="finance.refund">
+                              {!lockedCourseEvent && !voided && <Gate keys="finance.refund">
                                 <button
                                   onClick={() => requestTxnDelete(t)}
                                   className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 px-3 text-xs font-medium text-red-600 hover:bg-red-50"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
-                                  删除流水（提交审批）
+                                  撤销流水（提交审批）
                                 </button>
                               </Gate>}
                               {lockedCourseEvent && (
@@ -288,6 +308,11 @@ function Info({ label, value }: { label: string; value: string }) {
 function isCourseContractMetadata(metadata: unknown): boolean {
   return Boolean(metadata && typeof metadata === "object" && "domain" in metadata
     && (metadata as { domain?: unknown }).domain === "course_contract");
+}
+
+function isVoidedMetadata(metadata: unknown): boolean {
+  return Boolean(metadata && typeof metadata === "object" && "voided" in metadata
+    && (metadata as { voided?: unknown }).voided === true);
 }
 
 function SummaryCard({ label, value, tone }: { label: string; value: number; tone: "emerald" | "amber" | "red" | "blue" | "slate" }) {

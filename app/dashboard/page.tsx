@@ -12,6 +12,7 @@ import {
 import { getMe } from "@/lib/auth/me";
 import { getDashboard, resolveDashboardPeriod } from "@/lib/api/dashboard";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { approvalTypeLabel } from "@/lib/finance-display";
 import { PERMISSION_CATALOG, ROLE_DEFAULTS, ROLE_LABELS } from "@/lib/permissions";
 import { PeriodControl } from "@/components/dashboard/period-control";
 import { DailyScheduleTimeline } from "@/components/courses/daily-schedule-timeline";
@@ -31,7 +32,7 @@ export default async function DashboardPage({
     : me?.permissions ?? (role ? ROLE_DEFAULTS[role] ?? [] : []);
   const period = resolveDashboardPeriod(searchParams);
   const data = await getDashboard(role, permissions, period);
-  const roleLabel = role ? ROLE_LABELS[role] ?? role : "访客";
+  const roleLabel = role ? ROLE_LABELS[role] ?? "其他角色" : "访客";
 
   return (
     <div className="space-y-5 p-6">
@@ -184,7 +185,7 @@ function AdminView({ data }: { data: Extract<Awaited<ReturnType<typeof getDashbo
               <Link key={a.id} href="/audits" className="flex items-center justify-between px-5 py-3 hover:bg-slate-50">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium text-slate-800">{a.title}</div>
-                  <div className="text-xs text-slate-400">{a.target_label ?? a.type}</div>
+                  <div className="text-xs text-slate-400">{a.target_label ?? approvalTypeLabel(a.type)}</div>
                 </div>
                 <div className="shrink-0 text-xs text-slate-400">{formatDate(a.created_at, true)}</div>
               </Link>

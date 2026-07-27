@@ -177,7 +177,7 @@ function sourceLabel(source?: string | null) {
 }
 
 function statusLabel(status: string) {
-  return ({ enrolled: "在读", completed: "已完成", cancelled: "已退课", transferred: "已转课" } as Record<string, string>)[status] ?? status;
+  return ({ enrolled: "在读", completed: "已完成", cancelled: "已退课", transferred: "已转课" } as Record<string, string>)[status] ?? "其他状态";
 }
 
 function statusClass(status: string) {

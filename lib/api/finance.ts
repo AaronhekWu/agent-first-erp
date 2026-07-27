@@ -64,6 +64,7 @@ export async function getFinanceKpis(): Promise<FinanceKpis> {
     c = 0,
     courseFee = 0;
   for (const row of (data ?? []) as { type: string; amount: number; metadata?: Record<string, unknown> | null }[]) {
+    if (row.metadata?.voided === true) continue;
     const n = Number(row.amount);
     if (row.type === "recharge") r += n;
     else if (row.type === "refund") rf += n;

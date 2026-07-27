@@ -7,6 +7,7 @@ import { reverseApproval, reviewApproval } from "@/lib/api/approvals-client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { ListPagination } from "@/components/ui/list-pagination";
+import { approvalTypeLabel } from "@/lib/finance-display";
 
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 export type ExecutionStatus = "not_started" | "running" | "succeeded" | "failed" | "not_required";
@@ -142,7 +143,7 @@ export function ApprovalList({ rows, canReview }: { rows: ApprovalRow[]; canRevi
                       )}
                     </div>
                     <div className="mt-1 text-sm text-slate-500">
-                      {row.target_label ?? row.type} · {row.reason ?? "未填写原因"}
+                      {row.target_label ?? approvalTypeLabel(row.type)} · {row.reason ?? "未填写原因"}
                     </div>
                   </div>
                   <div className="text-sm text-slate-600">

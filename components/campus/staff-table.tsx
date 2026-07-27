@@ -173,7 +173,7 @@ export function StaffTable({ staff, departments, initialQuery = "" }: Props) {
                           cls,
                         )}
                       >
-                        {ROLE_LABEL[role] ?? role}
+                        {ROLE_LABEL[role] ?? "其他角色"}
                       </span>
                     ) : (
                       <span className="text-slate-400">未分配角色</span>
