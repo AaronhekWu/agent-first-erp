@@ -8,6 +8,7 @@ export type ApprovalType =
   | "course_delete"
   | "enrollment_drop"
   | "enrollment_transfer"
+  | "lesson_lot_delete"
   | "finance_refund"
   | "finance_consume"
   | "finance_txn_delete"
@@ -36,18 +37,7 @@ export async function requestApproval(input: ApprovalRequestInput) {
     p_payload: input.payload ?? {},
   });
   if (error) {
-    const message = error.message;
-    throw new Error(
-      message.includes("Could not find the function")
-        ? "审批后端尚未部署：缺少 rpc_create_approval_request，未执行原始操作。"
-        : message.includes("only active students")
-          ? "该学员已停用，不能重复提交删除审批。"
-          : message.includes("already pending")
-            ? "该对象已有待处理审批，请勿重复提交。"
-            : message.includes(":")
-              ? message.split(":").slice(1).join(":").trim()
-              : message,
-    );
+    throw new Error(approvalErrorMessage(error.message));
   }
   return data;
 }
@@ -81,11 +71,15 @@ export async function reviewApproval(
     p_status: status,
     p_reviewer_note: reviewerNote?.trim() || null,
   });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(approvalErrorMessage(error.message));
 
   const result = data as ReviewApprovalResult;
   if (!result.ok) {
-    throw new Error(result.error || "审批执行失败，申请仍保持待审批状态");
+    throw new Error(
+      result.error
+        ? approvalErrorMessage(result.error)
+        : "审批执行失败，申请仍保持待审批状态",
+    );
   }
   return result;
 }
@@ -96,6 +90,23 @@ export async function reverseApproval(id: string, reason: string) {
     p_id: id,
     p_reason: reason,
   });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(approvalErrorMessage(error.message));
   return data;
+}
+
+function approvalErrorMessage(message: string): string {
+  if (message.includes("Could not find the function")) {
+    return "审批服务尚未部署完成，本次操作未执行。";
+  }
+  if (message.includes("only active students")) {
+    return "该学员已停用，不能重复提交删除审批。";
+  }
+  if (message.includes("already pending") || message.includes("APPROVAL_ALREADY_PENDING")) {
+    return "该对象已有待处理审批，请勿重复提交。";
+  }
+  const separator = message.indexOf(":");
+  if (separator > 0 && /^[A-Z0-9_]+$/.test(message.slice(0, separator).trim())) {
+    return message.slice(separator + 1).trim();
+  }
+  return message;
 }

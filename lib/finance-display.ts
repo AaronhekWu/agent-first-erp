@@ -26,6 +26,7 @@ export const FINANCE_REFERENCE_LABELS: Record<string, string> = {
   approval: "审批记录",
   balance_reconciliation: "余额核对记录",
   enrollment_transfer: "转课记录",
+  lesson_lot_delete: "课时批次删除记录",
 };
 
 export const APPROVAL_TYPE_LABELS: Record<string, string> = {
@@ -34,6 +35,7 @@ export const APPROVAL_TYPE_LABELS: Record<string, string> = {
   finance_txn_delete: "流水撤销审批",
   enrollment_drop: "退课审批",
   enrollment_transfer: "转课审批",
+  lesson_lot_delete: "课时批次删除审批",
   student_delete: "学员停用审批",
   staff_deactivate: "成员停用审批",
   department_delete: "部门删除审批",

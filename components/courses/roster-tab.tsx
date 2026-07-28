@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { LogOut, ArrowRightLeft, ChevronDown, ChevronUp, Lock, ArrowUpDown, Plus, Save } from "lucide-react";
+import { LogOut, ArrowRightLeft, ChevronDown, ChevronUp, Lock, ArrowUpDown, Plus, Save, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/format";
 import { requestApproval, getLockedTargets } from "@/lib/api/approvals-client";
@@ -212,9 +212,12 @@ export function RosterTab({ enrollments, course, onMutate, onOpenEnrollment }: P
                       </div>
                       <LessonLotManager
                         enrollment={e}
-                        canEdit={e.status === "enrolled" && has("courses.pricing")}
+                        course={course}
+                        canEdit={e.status === "enrolled" && has("courses.pricing") && !locked.has(e.enrollment_id)}
+                        lockedTargets={locked}
                         onMutate={onMutate}
                         onOpenEnrollment={onOpenEnrollment}
+                        onApprovalSubmitted={refreshLocked}
                       />
                       {e.notes && <div className="mt-2 text-xs text-slate-500">报名备注：{e.notes}</div>}
                     </td>
@@ -256,16 +259,23 @@ export function RosterTab({ enrollments, course, onMutate, onOpenEnrollment }: P
 
 function LessonLotManager({
   enrollment,
+  course,
   canEdit,
+  lockedTargets,
   onMutate,
   onOpenEnrollment,
+  onApprovalSubmitted,
 }: {
   enrollment: CourseEnrollment;
+  course: CourseRow;
   canEdit: boolean;
+  lockedTargets: Set<string>;
   onMutate: () => Promise<void>;
   onOpenEnrollment: () => void;
+  onApprovalSubmitted: () => void;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<LessonLot | null>(null);
   const [sourceType, setSourceType] = useState<LessonLot["source_type"]>("paid");
   const [lessons, setLessons] = useState("");
   const [price, setPrice] = useState("");
@@ -382,7 +392,35 @@ function LessonLotManager({
                   </td>
                   <td className="px-2 py-2">{lot.enrolled_at.slice(0, 10)}</td>
                   <td className="max-w-56 truncate px-2 py-2 text-slate-500" title={lot.notes ?? ""}>{lot.notes || "—"}</td>
-                  {canEdit && <td className="px-2 py-2 text-right"><button type="button" onClick={() => startEdit(lot)} className="text-brand-600 hover:underline">编辑</button></td>}
+                  {canEdit && (
+                    <td className="px-2 py-2 text-right">
+                      {lockedTargets.has(lot.id) ? (
+                        <span
+                          title="该课时批次正在等待审批"
+                          className="inline-flex items-center gap-1 whitespace-nowrap text-amber-600"
+                        >
+                          <Lock className="h-3 w-3" />
+                          审批中
+                        </span>
+                      ) : (
+                        <div className="inline-flex items-center gap-2 whitespace-nowrap">
+                          <button type="button" onClick={() => startEdit(lot)} className="text-brand-600 hover:underline">
+                            编辑
+                          </button>
+                          <button
+                            type="button"
+                            disabled={lot.consumed_lessons > 0}
+                            onClick={() => setDeleteTarget(lot)}
+                            title={lot.consumed_lessons > 0 ? "该批次已有消课记录，不能删除" : "提交删除审批"}
+                            className="inline-flex items-center gap-0.5 text-red-500 hover:underline disabled:cursor-not-allowed disabled:text-slate-300 disabled:no-underline"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            删除
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  )}
                 </tr>
                 {editingId === lot.id && (
                   <tr>
@@ -395,6 +433,112 @@ function LessonLotManager({
         </table>
       </div>
       {editingId === "new" && <div className="mt-3">{editor}</div>}
+      {deleteTarget && (
+        <LessonLotDeleteModal
+          enrollment={enrollment}
+          course={course}
+          lot={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onDone={() => {
+            setDeleteTarget(null);
+            onApprovalSubmitted();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function LessonLotDeleteModal({
+  enrollment,
+  course,
+  lot,
+  onClose,
+  onDone,
+}: {
+  enrollment: CourseEnrollment;
+  course: CourseRow;
+  lot: LessonLot;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-900/40 p-4">
+      <div className="w-full max-w-md rounded-xl bg-white shadow-xl">
+        <div className="border-b border-slate-100 px-5 py-3 text-base font-semibold text-slate-800">
+          删除课时批次
+        </div>
+        <div className="space-y-3 px-5 py-4 text-sm">
+          <p className="text-slate-600">
+            将为 <span className="font-medium text-slate-800">{enrollment.student_name}</span> 提交课时批次删除审批。
+            审批通过后才会删除。
+          </p>
+          <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3 text-xs">
+            <div><span className="text-slate-400">课程</span><div className="mt-1 text-slate-700">{course.course_name}</div></div>
+            <div><span className="text-slate-400">批次类型</span><div className="mt-1 text-slate-700">{lotTypeLabel(lot.source_type)}</div></div>
+            <div><span className="text-slate-400">课时</span><div className="mt-1 text-slate-700">{lot.total_lessons} 节</div></div>
+            <div><span className="text-slate-400">释放锁定预付款</span><div className="mt-1 font-medium text-blue-600">{formatCurrency(lot.locked_amount ?? 0)}</div></div>
+          </div>
+          <div className="rounded-md bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-700">
+            已产生消课的批次不能删除。若这是该报名最后一个批次，审批通过后报名状态会改为已退课；最高管理员仍可从审批记录中撤销并恢复。
+          </div>
+          <label className="block text-xs text-slate-500">
+            删除原因 <span className="text-red-500">*</span>
+            <textarea
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="请填写删除该报名批次的具体原因"
+              className="mt-1 min-h-[72px] w-full rounded border border-slate-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+            />
+          </label>
+          {error && <div className="rounded bg-red-50 px-2 py-1 text-xs text-red-600">{error}</div>}
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            className="h-9 rounded-md border border-slate-200 bg-white px-4 text-sm"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            disabled={submitting || !reason.trim()}
+            onClick={async () => {
+              setSubmitting(true);
+              setError(null);
+              try {
+                await requestApproval({
+                  type: "lesson_lot_delete",
+                  title: `课时批次删除审批：${enrollment.student_name}`,
+                  reason: reason.trim(),
+                  targetId: lot.id,
+                  targetLabel: `${enrollment.student_name} · ${course.course_name} · ${lot.enrolled_at.slice(0, 10)}`,
+                  amount: Number(lot.locked_amount ?? 0),
+                  payload: {
+                    p_lot_id: lot.id,
+                    p_enrollment_id: enrollment.enrollment_id,
+                    p_reason: reason.trim(),
+                  },
+                });
+                onDone();
+              } catch (caught) {
+                setError((caught as Error).message);
+              } finally {
+                setSubmitting(false);
+              }
+            }}
+            className="h-9 rounded-md bg-red-500 px-4 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50"
+          >
+            {submitting ? "提交中…" : "提交删除审批"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
