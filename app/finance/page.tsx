@@ -44,7 +44,7 @@ export default async function FinancePage({ searchParams }: PageProps) {
         <KCard label="本月充值" value={kpis.recharge_mtd} Icon={Wallet} bg="bg-emerald-50" color="text-emerald-600" />
         <KCard label="本月退费" value={kpis.refund_mtd} Icon={Undo2} bg="bg-amber-50" color="text-amber-600" />
         <KCard label="本月消课" value={kpis.consume_mtd} Icon={Minus} bg="bg-red-50" color="text-red-500" />
-        <KCard label="本月报课合同" value={kpis.course_fee_mtd} Icon={BookOpenCheck} bg="bg-blue-50" color="text-blue-600" />
+        <KCard label="本月净锁定预付款" value={kpis.prepayment_mtd} Icon={BookOpenCheck} bg="bg-blue-50" color="text-blue-600" />
         <KCard label="本月现金净额" value={kpis.net_mtd} Icon={ListOrdered} bg="bg-violet-50" color="text-violet-600" />
       </div>
 

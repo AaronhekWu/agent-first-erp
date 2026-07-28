@@ -20,6 +20,7 @@ interface Props {
   enrollments: CourseEnrollment[];
   course: CourseRow;
   onMutate: () => Promise<void>;
+  onOpenEnrollment: () => void;
 }
 
 type RosterSort = "default" | "newest" | "name" | "remaining";
@@ -31,7 +32,7 @@ const ROSTER_SORT_OPTIONS: { value: RosterSort; label: string }[] = [
   { value: "remaining", label: "剩余课时：从多到少" },
 ];
 
-export function RosterTab({ enrollments, course, onMutate }: Props) {
+export function RosterTab({ enrollments, course, onMutate, onOpenEnrollment }: Props) {
   const { has } = usePermissions();
   const [dropTarget, setDropTarget] = useState<CourseEnrollment | null>(null);
   const [transferTarget, setTransferTarget] = useState<CourseEnrollment | null>(null);
@@ -104,7 +105,7 @@ export function RosterTab({ enrollments, course, onMutate }: Props) {
             {enrollments.length === 0 && (
               <tr>
                 <td colSpan={9} className="px-3 py-10 text-center text-sm text-slate-400">
-                  暂无学员，请前往「添加学员」Tab
+                  暂无学员，请前往「学员报名」
                 </td>
               </tr>
             )}
@@ -209,7 +210,12 @@ export function RosterTab({ enrollments, course, onMutate }: Props) {
                         <PricingItem label="报名来源" value={sourceLabel(e.source)} />
                         <PricingItem label="优惠说明" value={e.discount_reason || snapshotLabel(e.price_snapshot) || "无优惠"} />
                       </div>
-                      <LessonLotManager enrollment={e} canEdit={e.status === "enrolled" && has("courses.pricing")} onMutate={onMutate} />
+                      <LessonLotManager
+                        enrollment={e}
+                        canEdit={e.status === "enrolled" && has("courses.pricing")}
+                        onMutate={onMutate}
+                        onOpenEnrollment={onOpenEnrollment}
+                      />
                       {e.notes && <div className="mt-2 text-xs text-slate-500">报名备注：{e.notes}</div>}
                     </td>
                   </tr>
@@ -252,10 +258,12 @@ function LessonLotManager({
   enrollment,
   canEdit,
   onMutate,
+  onOpenEnrollment,
 }: {
   enrollment: CourseEnrollment;
   canEdit: boolean;
   onMutate: () => Promise<void>;
+  onOpenEnrollment: () => void;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sourceType, setSourceType] = useState<LessonLot["source_type"]>("paid");
@@ -322,7 +330,7 @@ function LessonLotManager({
   };
   const editor = editingId ? (
     <div className="grid gap-3 rounded-lg border border-brand-100 bg-brand-50/40 p-3 sm:grid-cols-2 lg:grid-cols-5">
-      <label className="text-[11px] text-slate-500">批次类型<select value={sourceType} disabled={editingId !== "new"} onChange={(event) => { const value = event.target.value as LessonLot["source_type"]; setSourceType(value); if (value === "gift") setPrice("0"); }} className="mt-1 h-9 w-full rounded border border-slate-200 bg-white px-2 text-xs"><option value="paid">正常付费</option><option value="transfer">转课带入</option><option value="gift">赠送</option><option value="adjustment">调整</option></select></label>
+      <label className="text-[11px] text-slate-500">批次类型<select value={sourceType} disabled className="mt-1 h-9 w-full rounded border border-slate-200 bg-slate-50 px-2 text-xs"><option value="paid">正常付费</option><option value="transfer">转课带入</option><option value="gift">赠送</option><option value="adjustment">调整</option></select></label>
       <label className="text-[11px] text-slate-500">总课时<input type="number" min={editing?.consumed_lessons ?? 1} step={1} value={lessons} onChange={(event) => setLessons(event.target.value)} className="mt-1 h-9 w-full rounded border border-slate-200 bg-white px-2 text-xs" /></label>
       <label className="text-[11px] text-slate-500">实际单价<input type="number" min={0} step="0.01" disabled={sourceType === "gift"} value={price} onChange={(event) => setPrice(event.target.value)} className="mt-1 h-9 w-full rounded border border-slate-200 bg-white px-2 text-xs" /></label>
       <label className="text-[11px] text-slate-500">报名日期<input type="date" value={enrolledAt} onChange={(event) => setEnrolledAt(event.target.value)} className="mt-1 h-9 w-full rounded border border-slate-200 bg-white px-2 text-xs" /></label>
@@ -344,7 +352,7 @@ function LessonLotManager({
         </div>
         {canEdit && (
           <div className="flex gap-1.5">
-            <button type="button" onClick={() => startAdd("paid")} className="inline-flex h-8 items-center gap-1 rounded-md border border-brand-200 bg-white px-2.5 text-xs text-brand-700 hover:bg-brand-50"><Plus className="h-3 w-3" />新增课时付费</button>
+            <button type="button" onClick={onOpenEnrollment} className="inline-flex h-8 items-center gap-1 rounded-md border border-brand-200 bg-white px-2.5 text-xs text-brand-700 hover:bg-brand-50"><Plus className="h-3 w-3" />新增付费报名</button>
             <button type="button" onClick={() => startAdd("gift")} className="inline-flex h-8 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 text-xs text-amber-700 hover:bg-amber-100"><Plus className="h-3 w-3" />赠送课时</button>
           </div>
         )}
@@ -352,7 +360,7 @@ function LessonLotManager({
       <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
         <table className="w-full min-w-[720px] text-xs">
           <thead className="bg-slate-50 text-slate-500">
-            <tr><th className="px-2 py-2 text-left">类型</th><th className="px-2 py-2 text-right">实际单价</th><th className="px-2 py-2 text-center">已消 / 剩余 / 总课时</th><th className="px-2 py-2 text-right">批次总额</th><th className="px-2 py-2 text-left">报名时间</th><th className="px-2 py-2 text-left">备注</th>{canEdit && <th className="px-2 py-2 text-right">操作</th>}</tr>
+            <tr><th className="px-2 py-2 text-left">类型</th><th className="px-2 py-2 text-right">实际单价</th><th className="px-2 py-2 text-center">已消 / 剩余 / 总课时</th><th className="px-2 py-2 text-right">批次总额</th><th className="px-2 py-2 text-right">锁定预付款</th><th className="px-2 py-2 text-left">报名时间</th><th className="px-2 py-2 text-left">备注</th>{canEdit && <th className="px-2 py-2 text-right">操作</th>}</tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {enrollment.lesson_lots.map((lot) => (
@@ -362,13 +370,23 @@ function LessonLotManager({
                   <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(lot.unit_price)}</td>
                   <td className="px-2 py-2 text-center tabular-nums">{lot.consumed_lessons} / <span className="font-medium text-amber-600">{lot.remaining_lessons}</span> / {lot.total_lessons}</td>
                   <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(lot.total_amount)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums">
+                    <span className={Number(lot.unfunded_amount ?? 0) > 0 ? "text-amber-600" : "text-blue-600"}>
+                      {formatCurrency(lot.locked_amount ?? 0)}
+                    </span>
+                    {Number(lot.unfunded_amount ?? 0) > 0 && (
+                      <div className="text-[10px] text-amber-600">
+                        历史待补 {formatCurrency(lot.unfunded_amount)}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-2 py-2">{lot.enrolled_at.slice(0, 10)}</td>
                   <td className="max-w-56 truncate px-2 py-2 text-slate-500" title={lot.notes ?? ""}>{lot.notes || "—"}</td>
                   {canEdit && <td className="px-2 py-2 text-right"><button type="button" onClick={() => startEdit(lot)} className="text-brand-600 hover:underline">编辑</button></td>}
                 </tr>
                 {editingId === lot.id && (
                   <tr>
-                    <td colSpan={canEdit ? 7 : 6} className="bg-white px-2 py-2">{editor}</td>
+                    <td colSpan={canEdit ? 8 : 7} className="bg-white px-2 py-2">{editor}</td>
                   </tr>
                 )}
               </Fragment>
@@ -411,10 +429,12 @@ function DropConfirmModal({
   onDone: () => Promise<void>;
 }) {
   const [reason, setReason] = useState("");
-  const [refund, setRefund] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const refundAmount = refund ? Number(enrollment.remaining_lessons ?? 0) * Number(enrollment.unit_price) : 0;
+  const releasedPrepayment = enrollment.lesson_lots.reduce(
+    (sum, lot) => sum + Number(lot.locked_amount ?? 0),
+    0,
+  );
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-900/40 p-4">
       <div className="w-full max-w-md rounded-xl bg-white shadow-xl">
@@ -424,10 +444,10 @@ function DropConfirmModal({
             为 <span className="font-medium text-slate-800">{enrollment.student_name}</span>{" "}
             退课 (剩余 {enrollment.remaining_lessons ?? 0} 课时 × ¥{enrollment.unit_price})
           </p>
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input type="checkbox" checked={refund} onChange={(e) => setRefund(e.target.checked)} />
-            同时按剩余课时退还 <span className="font-medium text-amber-600">{formatCurrency(refundAmount)}</span> 到学员账户
-          </label>
+          <div className="rounded-md bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-700">
+            退课后会释放锁定预付款 <span className="font-semibold">{formatCurrency(releasedPrepayment)}</span>{" "}
+            回到可用余额，总余额不变。如需把资金退给家长，请退课完成后再到财务管理提交退费审批。
+          </div>
           <div>
             <label className="text-xs text-slate-500">退课原因</label>
             <textarea
@@ -444,7 +464,7 @@ function DropConfirmModal({
             取消
           </button>
           <button
-            disabled={submitting}
+            disabled={submitting || !reason.trim()}
             onClick={async () => {
               setSubmitting(true);
               setError(null);
@@ -452,14 +472,14 @@ function DropConfirmModal({
                 await requestApproval({
                   type: "enrollment_drop",
                   title: `退课审批：${enrollment.student_name}`,
-                  reason: reason.trim() || "未填写退课原因",
+                  reason: reason.trim(),
                   targetId: enrollment.enrollment_id,
                   targetLabel: enrollment.student_name,
-                  amount: refundAmount,
+                  amount: releasedPrepayment,
                   payload: {
                     p_enrollment_id: enrollment.enrollment_id,
-                    p_refund_remaining: refund,
-                    p_reason: reason.trim() || null,
+                    p_refund_remaining: true,
+                    p_reason: reason.trim(),
                   },
                 });
                 await onDone();
@@ -560,7 +580,7 @@ function TransferModal({
             取消
           </button>
           <button
-            disabled={submitting || !targetId || !Number(carry)}
+            disabled={submitting || !targetId || !Number(carry) || !reason.trim()}
             onClick={async () => {
               setSubmitting(true);
               setError(null);
@@ -568,14 +588,14 @@ function TransferModal({
                 await requestApproval({
                   type: "enrollment_transfer",
                   title: `转课审批：${enrollment.student_name}`,
-                  reason: reason.trim() || "未填写转课原因",
+                  reason: reason.trim(),
                   targetId: enrollment.enrollment_id,
                   targetLabel: enrollment.student_name,
                   payload: {
                     p_source_enrollment_id: enrollment.enrollment_id,
                     p_target_course_id: targetId,
                     p_carry_lessons: Number(carry),
-                    p_reason: reason.trim() || null,
+                    p_reason: reason.trim(),
                   },
                 });
                 await onDone();

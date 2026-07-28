@@ -8,6 +8,9 @@ export const FINANCE_TRANSACTION_LABELS: Record<string, string> = {
   adjustment: "账务调整",
   enrollment: "课程报名",
   lesson_purchase: "课时付费",
+  prepayment_lock: "锁定预付款",
+  prepayment_release: "释放预付款",
+  prepayment_adjustment: "调整预付款",
 };
 
 export const FINANCE_REFERENCE_LABELS: Record<string, string> = {
@@ -22,6 +25,7 @@ export const FINANCE_REFERENCE_LABELS: Record<string, string> = {
   transaction_reversal: "流水撤销记录",
   approval: "审批记录",
   balance_reconciliation: "余额核对记录",
+  enrollment_transfer: "转课记录",
 };
 
 export const APPROVAL_TYPE_LABELS: Record<string, string> = {

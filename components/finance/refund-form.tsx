@@ -1,22 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Undo2 } from "lucide-react";
 import { Field, inputCls, textareaCls } from "@/components/ui/form";
 import { StudentPicker } from "./student-picker";
 import { requestApproval } from "@/lib/api/approvals-client";
 import { formatCurrency } from "@/lib/format";
-import type { StudentSearchResult } from "@/lib/api/courses";
+import { listActiveCourseOptions } from "@/lib/api/courses-client";
+import type { ActiveCourseOption, StudentSearchResult } from "@/lib/api/courses";
 
 export function RefundForm() {
   const router = useRouter();
   const [student, setStudent] = useState<StudentSearchResult | null>(null);
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
+  const [courseId, setCourseId] = useState("");
+  const [courses, setCourses] = useState<ActiveCourseOption[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+
+  useEffect(() => {
+    void listActiveCourseOptions()
+      .then(setCourses)
+      .catch((caught) => setError((caught as Error).message));
+  }, []);
 
   const submit = async () => {
     if (!student) return setError("请选择学员");
@@ -34,12 +43,18 @@ export function RefundForm() {
         targetId: student.id,
         targetLabel: student.name,
         amount: n,
-        payload: { p_student_id: student.id, p_amount: n, p_reason: reason.trim() },
+        payload: {
+          p_student_id: student.id,
+          p_amount: n,
+          p_reason: reason.trim(),
+          p_course_id: courseId || null,
+        },
       });
       setInfo(`已提交 ${student.name} 的退费审批 ${formatCurrency(n)}`);
       setStudent(null);
       setAmount("");
       setReason("");
+      setCourseId("");
       router.refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -68,6 +83,23 @@ export function RefundForm() {
           placeholder="0.00"
         />
       </Field>
+      <Field label="关联课程">
+        <select className={inputCls} value={courseId} onChange={(event) => setCourseId(event.target.value)}>
+          <option value="">非课程可用余额</option>
+          {courses.map((course) => (
+            <option key={course.id} value={course.id}>{course.name}</option>
+          ))}
+        </select>
+      </Field>
+      {student && (
+        <div className="rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          当前总余额 {formatCurrency(student.balance ?? 0)}；可退余额{" "}
+          <span className="font-medium text-slate-800">
+            {formatCurrency(student.available_balance ?? student.balance ?? 0)}
+          </span>
+          。课程已锁定的预付款不能直接退费，请先办理退课。
+        </div>
+      )}
       <Field label="退费理由" required>
         <textarea
           className={textareaCls}

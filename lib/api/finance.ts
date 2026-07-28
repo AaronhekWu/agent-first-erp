@@ -12,7 +12,10 @@ export type TxType =
   | "gift"
   | "adjustment"
   | "enrollment"
-  | "lesson_purchase";
+  | "lesson_purchase"
+  | "prepayment_lock"
+  | "prepayment_release"
+  | "prepayment_adjustment";
 
 export interface Transaction {
   id: string;
@@ -37,7 +40,7 @@ export interface FinanceKpis {
   recharge_mtd: number;
   refund_mtd: number;
   consume_mtd: number;
-  course_fee_mtd: number;
+  prepayment_mtd: number;
   net_mtd: number;
 }
 
@@ -62,7 +65,7 @@ export async function getFinanceKpis(): Promise<FinanceKpis> {
   let r = 0,
     rf = 0,
     c = 0,
-    courseFee = 0;
+    prepayment = 0;
   for (const row of (data ?? []) as { type: string; amount: number; metadata?: Record<string, unknown> | null }[]) {
     if (row.metadata?.voided === true) continue;
     const n = Number(row.amount);
@@ -70,16 +73,19 @@ export async function getFinanceKpis(): Promise<FinanceKpis> {
     else if (row.type === "refund") rf += n;
     else if (row.type === "consume") c += n;
     if (
-      row.type === "enrollment"
-      || row.type === "lesson_purchase"
-      || (row.type === "adjustment" && row.metadata?.domain === "course_contract")
-    ) courseFee += n;
+      row.type === "prepayment_lock"
+      && row.metadata?.event !== "historical_lock_initialization"
+    ) prepayment += n;
+    if (row.type === "prepayment_release") prepayment -= n;
+    if (row.type === "prepayment_adjustment") {
+      prepayment += Number(row.metadata?.locked_delta ?? 0);
+    }
   }
   return {
     recharge_mtd: r,
     refund_mtd: rf,
     consume_mtd: c,
-    course_fee_mtd: courseFee,
+    prepayment_mtd: prepayment,
     net_mtd: r - rf,
   };
 }
@@ -112,12 +118,19 @@ export async function listTransactions(opts: {
         stu_students?: { name: string; student_code: string | null };
       };
     }
-  >).map((r) => ({
-    ...r,
-    student_id: r.fin_accounts?.student_id,
-    student_name: r.fin_accounts?.stu_students?.name,
-    student_code: r.fin_accounts?.stu_students?.student_code ?? null,
-  }));
+  >)
+    .filter((row) => {
+      const metadata = row.metadata as { domain?: unknown } | null;
+      return row.type !== "enrollment"
+        && row.type !== "lesson_purchase"
+        && metadata?.domain !== "course_contract";
+    })
+    .map((r) => ({
+      ...r,
+      student_id: r.fin_accounts?.student_id,
+      student_name: r.fin_accounts?.stu_students?.name,
+      student_code: r.fin_accounts?.stu_students?.student_code ?? null,
+    }));
 
   // 解析发起人姓名 (谁发起)
   const creatorIds = [...new Set(rows.map((r) => r.created_by).filter((id): id is string => Boolean(id)))];
@@ -137,7 +150,7 @@ export async function getRechargeStudent(studentId?: string): Promise<StudentSea
   const sb = createServerSupabase();
   const { data, error } = await sb
     .from("v_student_overview")
-    .select("id, name, student_code, phone, status")
+    .select("id, name, student_code, phone, status, balance, frozen_amount, available_balance")
     .eq("id", studentId)
     .eq("status", "active")
     .maybeSingle();

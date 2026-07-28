@@ -50,7 +50,7 @@ export default async function CoursesPage({ searchParams }: PageProps) {
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">课程管理</h1>
           <p className="mt-1 text-sm text-slate-500">
-            点击任一课程卡片进入「班级花名册 / 添加学员 / 每日点名」管理面板
+            点击任一课程卡片进入「班级花名册 / 学员报名 / 每日点名」管理面板
           </p>
         </div>
         <div className="flex items-center gap-2">

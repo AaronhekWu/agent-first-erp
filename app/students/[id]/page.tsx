@@ -10,6 +10,7 @@ import { StudentSignalsCard } from "@/components/students/student-signals";
 import { TransactionLedger } from "@/components/students/transaction-ledger";
 import { StudentEditButton } from "@/components/students/student-edit-button";
 import { StudentEnrollmentHistory } from "@/components/students/student-enrollment-history";
+import { StudentFinanceOverview } from "@/components/students/student-finance-overview";
 import {
   formatCurrency,
   formatDate,
@@ -160,12 +161,13 @@ export default async function StudentDetailPage({ params }: Props) {
           <Wallet className="h-4 w-4 text-amber-500" />
           金额汇总
         </div>
-        <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-5">
-          <KvBox label="当前余额" value={formatCurrency(a?.balance ?? 0)} accent="amber" />
+        <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-3 xl:grid-cols-6">
+          <KvBox label="账户总余额" value={formatCurrency(a?.balance ?? 0)} accent="amber" />
+          <KvBox label="可用余额" value={formatCurrency((a?.balance ?? 0) - (a?.frozen_amount ?? 0))} />
           <KvBox label="累计充值" value={formatCurrency(a?.total_recharged ?? 0)} />
           <KvBox label="累计消费" value={formatCurrency(a?.total_consumed ?? 0)} />
           <KvBox label="累计退款" value={formatCurrency(a?.total_refunded ?? 0)} />
-          <KvBox label="冻结金额" value={formatCurrency(a?.frozen_amount ?? 0)} />
+          <KvBox label="锁定预付款" value={formatCurrency(a?.frozen_amount ?? 0)} />
         </div>
       </div>
 
@@ -181,6 +183,8 @@ export default async function StudentDetailPage({ params }: Props) {
           <KvBox label="剩余课时" value={`${lessons.remaining} 节`} accent="amber" />
         </div>
       </div>
+
+      <StudentFinanceOverview profile={detail.financial_profile} />
 
       <StudentEnrollmentHistory enrollments={detail.enrollments} events={detail.enrollment_events ?? []} />
 
@@ -222,29 +226,6 @@ function InfoLine({
     </div>
   );
 }
-function KvRow({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: string;
-  accent?: "amber";
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-slate-500">{label}</span>
-      <span
-        className={`tabular-nums font-medium ${
-          accent === "amber" ? "text-amber-600" : "text-slate-800"
-        }`}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
-
 function KvBox({
   label,
   value,

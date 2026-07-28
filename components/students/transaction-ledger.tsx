@@ -12,6 +12,7 @@ export interface LedgerTransaction {
   balance_before: number;
   balance_after: number;
   description?: string | null;
+  metadata?: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -25,6 +26,9 @@ const TX_TYPE_LABEL: Record<string, string> = {
   adjustment: "账务调整",
   enrollment: "课程报名",
   lesson_purchase: "课时付费",
+  prepayment_lock: "锁定预付款",
+  prepayment_release: "释放预付款",
+  prepayment_adjustment: "调整预付款",
 };
 
 const TX_TYPE_CLS: Record<string, string> = {
@@ -37,6 +41,9 @@ const TX_TYPE_CLS: Record<string, string> = {
   adjustment: "text-slate-600",
   enrollment: "text-blue-600",
   lesson_purchase: "text-brand-600",
+  prepayment_lock: "text-blue-600",
+  prepayment_release: "text-cyan-600",
+  prepayment_adjustment: "text-indigo-600",
 };
 
 // 快捷筛选组: 覆盖用户最常定位的三类记录
@@ -173,9 +180,22 @@ export function TransactionLedger({ transactions }: { transactions: LedgerTransa
                   <td className={`px-3 py-2 text-right tabular-nums ${TX_TYPE_CLS[t.type] ?? "text-slate-700"}`}>
                     {formatCurrency(t.amount)}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-500">
-                    {formatCurrency(t.balance_before)} →{" "}
-                    <span className="text-slate-800">{formatCurrency(t.balance_after)}</span>
+                  <td className="px-3 py-2 text-right text-xs tabular-nums text-slate-500">
+                    {t.metadata?.available_before !== undefined && t.metadata?.available_after !== undefined ? (
+                      <>
+                        可用 {formatCurrency(Number(t.metadata.available_before))} →{" "}
+                        <span className="text-slate-800">{formatCurrency(Number(t.metadata.available_after))}</span>
+                        <div className="text-[11px] text-blue-600">
+                          预付款 {formatCurrency(Number(t.metadata.frozen_before ?? 0))} →{" "}
+                          {formatCurrency(Number(t.metadata.frozen_after ?? 0))}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {formatCurrency(t.balance_before)} →{" "}
+                        <span className="text-slate-800">{formatCurrency(t.balance_after)}</span>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}

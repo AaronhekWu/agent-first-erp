@@ -45,6 +45,10 @@ export function StudentPicker({ value, onChange, placeholder }: Props) {
             <span className={Number(value.balance ?? 0) < 0 ? "font-medium text-red-500" : "font-medium text-amber-600"}>
               {formatCurrency(Number(value.balance ?? 0))}
             </span>
+            {" "}· 可用{" "}
+            <span className="font-medium text-emerald-600">
+              {formatCurrency(Number(value.available_balance ?? value.balance ?? 0))}
+            </span>
           </div>
         </div>
         <button onClick={() => onChange(null)} className="grid h-7 w-7 place-items-center rounded text-slate-500 hover:bg-slate-200">
@@ -88,9 +92,14 @@ export function StudentPicker({ value, onChange, placeholder }: Props) {
                     {s.student_code ?? "无编号"} · {displayPhone(s.phone)}
                   </div>
                 </div>
-                <span className={`text-xs font-medium tabular-nums ${Number(s.balance ?? 0) < 0 ? "text-red-500" : "text-amber-600"}`}>
-                  {formatCurrency(Number(s.balance ?? 0))}
-                </span>
+                <div className="text-right text-[11px] tabular-nums">
+                  <div className={Number(s.balance ?? 0) < 0 ? "font-medium text-red-500" : "text-slate-500"}>
+                    总余额 {formatCurrency(Number(s.balance ?? 0))}
+                  </div>
+                  <div className="font-medium text-emerald-600">
+                    可用 {formatCurrency(Number(s.available_balance ?? s.balance ?? 0))}
+                  </div>
+                </div>
               </button>
             ))
           )}

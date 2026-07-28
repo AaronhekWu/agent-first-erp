@@ -129,13 +129,14 @@ export function StudentEnrollmentHistory({
                                   <th className="px-3 py-2 text-right">实际单价</th>
                                   <th className="px-3 py-2 text-center">已消 / 剩余 / 总课时</th>
                                   <th className="px-3 py-2 text-right">批次总额</th>
+                                  <th className="px-3 py-2 text-right">锁定预付款</th>
                                   <th className="px-3 py-2 text-left">报名时间</th>
                                   <th className="px-3 py-2 text-left">备注</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100">
                                 {enrollment.lesson_lots.length === 0 && (
-                                  <tr><td colSpan={6} className="px-3 py-6 text-center text-slate-400">暂无课时批次</td></tr>
+                                  <tr><td colSpan={7} className="px-3 py-6 text-center text-slate-400">暂无课时批次</td></tr>
                                 )}
                                 {enrollment.lesson_lots.map((lot) => <LessonLotRow key={lot.id} lot={lot} />)}
                               </tbody>
@@ -162,6 +163,16 @@ function LessonLotRow({ lot }: { lot: LessonLot }) {
       <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(lot.unit_price)}</td>
       <td className="px-3 py-2 text-center tabular-nums">{lot.consumed_lessons} / <span className="font-medium text-amber-600">{lot.remaining_lessons}</span> / {lot.total_lessons}</td>
       <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(lot.total_amount)}</td>
+      <td className="px-3 py-2 text-right tabular-nums">
+        <span className={Number(lot.unfunded_amount ?? 0) > 0 ? "text-amber-600" : "text-blue-600"}>
+          {formatCurrency(lot.locked_amount ?? 0)}
+        </span>
+        {Number(lot.unfunded_amount ?? 0) > 0 && (
+          <div className="text-[10px] text-amber-600">
+            历史待补 {formatCurrency(lot.unfunded_amount)}
+          </div>
+        )}
+      </td>
       <td className="px-3 py-2">{formatDate(lot.enrolled_at, true)}</td>
       <td className="max-w-72 truncate px-3 py-2 text-slate-500" title={lot.notes ?? ""}>{lot.notes || "—"}</td>
     </tr>

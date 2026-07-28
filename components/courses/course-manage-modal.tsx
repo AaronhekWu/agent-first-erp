@@ -26,7 +26,7 @@ interface Props {
 const TABS = [
   { key: "plan", label: "课程进度", Icon: Gauge },
   { key: "roster", label: "班级花名册", Icon: Users },
-  { key: "enroll", label: "添加学员", Icon: UserPlus },
+  { key: "enroll", label: "学员报名", Icon: UserPlus },
   { key: "attendance", label: "每日点名", Icon: CalendarCheck },
 ] as const;
 
@@ -72,7 +72,8 @@ export function CourseManageModal({ open, onClose, course, departments, initialT
 
   if (!open) return null;
   const lifecycle = getCourseLifecycle(course);
-  const enrollmentClosed = lifecycle === "full" || lifecycle === "ready_to_complete" || lifecycle === "completed";
+  // 满班时仍允许班内学员追加付费报名；后端只会拦截新增占位学员。
+  const enrollmentClosed = lifecycle === "ready_to_complete" || lifecycle === "completed";
   const rosterEnrollments = enrollments.filter(
     (enrollment) => enrollment.status === "enrolled" || enrollment.status === "completed",
   );
@@ -147,6 +148,7 @@ export function CourseManageModal({ open, onClose, course, departments, initialT
                   enrollments={rosterEnrollments}
                   course={course}
                   onMutate={handleMutation}
+                  onOpenEnrollment={() => setTab("enroll")}
                 />
               )}
               {tab === "enroll" && (

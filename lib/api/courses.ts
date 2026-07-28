@@ -60,6 +60,8 @@ export interface CourseEnrollment {
   notes: string | null;
   price_snapshot: Record<string, unknown>;
   balance: number;
+  frozen_amount: number;
+  available_balance: number;
   today_attendance_id: string | null;
   today_status: string | null;
   enrolled_at: string;
@@ -74,6 +76,8 @@ export interface LessonLot {
   consumed_lessons: number;
   remaining_lessons: number;
   total_amount: number;
+  locked_amount: number;
+  unfunded_amount: number;
   notes: string | null;
   enrolled_at: string;
 }
@@ -113,6 +117,8 @@ export interface StudentSearchResult {
   phone: string | null;
   status: string;
   balance?: number | null;
+  frozen_amount?: number | null;
+  available_balance?: number | null;
 }
 
 // ---------- 服务端 ----------

@@ -144,9 +144,10 @@ export interface RechargeInput {
   p_bonus_amount?: number | null;
   p_notes?: string | null;
   p_payment_ref?: string | null;
+  p_course_id?: string | null;
 }
 export function recharge(input: RechargeInput) {
-  return callRpc("rpc_recharge", { ...input });
+  return callRpc("rpc_recharge_v2", { ...input });
 }
 
 export interface RefundInput {

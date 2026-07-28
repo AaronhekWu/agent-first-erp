@@ -24,6 +24,9 @@ const TYPE_LABEL: Record<string, { label: string; cls: string }> = {
   adjustment: { label: "账务调整", cls: "text-slate-600" },
   enrollment: { label: "课程报名", cls: "text-blue-600" },
   lesson_purchase: { label: "课时付费", cls: "text-brand-600" },
+  prepayment_lock: { label: "锁定预付款", cls: "text-blue-600" },
+  prepayment_release: { label: "释放预付款", cls: "text-cyan-600" },
+  prepayment_adjustment: { label: "调整预付款", cls: "text-indigo-600" },
 };
 
 export function TransactionList({ rows }: { rows: Transaction[] }) {
@@ -64,16 +67,33 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
         if (t.type === "consume") acc.consume += amount;
         if (t.type === "recharge") acc.net += amount;
         if (t.type === "refund") acc.net -= amount;
-        if (
-          t.type === "enrollment"
-          || t.type === "lesson_purchase"
-          || (t.type === "adjustment" && isCourseContractMetadata(t.metadata))
-        ) acc.courseFee += amount;
+        if (t.type === "prepayment_lock") acc.prepayment += amount;
+        if (t.type === "prepayment_release") acc.prepayment -= amount;
+        if (t.type === "prepayment_adjustment") {
+          acc.prepayment += Number(transactionMetadata(t.metadata).locked_delta ?? 0);
+        }
         return acc;
       },
-      { recharge: 0, refund: 0, consume: 0, courseFee: 0, net: 0 },
+      { recharge: 0, refund: 0, consume: 0, prepayment: 0, net: 0 },
     );
   }, [filtered]);
+
+  const columnWidths = useMemo(() => ({
+    time: 136,
+    type: Math.max(112, ...rows.map((row) => visualTextWidth(financeTransactionLabel(row.type), 14, 36))),
+    student: Math.max(148, ...rows.map((row) => visualTextWidth(
+      `${row.student_name ?? "未知学员"} ${row.student_code ?? ""}`,
+      14,
+      48,
+    ))),
+    description: Math.max(360, Math.min(
+      560,
+      ...rows.map((row) => visualTextWidth(row.description ?? "无备注", 13, 48)),
+    )),
+    amount: 132,
+    balance: 260,
+    action: 92,
+  }), [rows]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -172,7 +192,7 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
         <SummaryCard label="筛选充值" value={summary.recharge} tone="emerald" />
         <SummaryCard label="筛选退费" value={summary.refund} tone="amber" />
         <SummaryCard label="筛选消费" value={summary.consume} tone="red" />
-        <SummaryCard label="筛选报课合同" value={summary.courseFee} tone="blue" />
+        <SummaryCard label="筛选净锁定预付款" value={summary.prepayment} tone="blue" />
         <SummaryCard label="筛选现金净额" value={summary.net} tone="slate" />
       </div>
 
@@ -184,7 +204,16 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
           <span>数据源：最近 {rows.length} 条流水</span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] text-sm">
+          <table className="w-full min-w-[1260px] table-fixed text-sm">
+            <colgroup>
+              <col style={{ width: columnWidths.time }} />
+              <col style={{ width: columnWidths.type }} />
+              <col style={{ width: columnWidths.student }} />
+              <col style={{ width: columnWidths.description }} />
+              <col style={{ width: columnWidths.amount }} />
+              <col style={{ width: columnWidths.balance }} />
+              <col style={{ width: columnWidths.action }} />
+            </colgroup>
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-3 py-3 text-left">时间</th>
@@ -207,28 +236,34 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
               {paged.map((t) => {
                 const meta = TYPE_LABEL[t.type] ?? { label: financeTransactionLabel(t.type), cls: "text-slate-700" };
                 const isOpen = expanded === t.id;
-                const lockedCourseEvent = isCourseContractMetadata(t.metadata);
+                const metadata = transactionMetadata(t.metadata);
+                const sourceManaged = isSourceManagedTransaction(t);
                 const voided = isVoidedMetadata(t.metadata);
-                const balanceDisplay = lockedCourseEvent
-                  ? "不影响钱包余额"
-                  : `${formatCurrency(t.balance_before)} → ${formatCurrency(t.balance_after)}`;
+                const balanceDisplay = financeChangeText(t);
                 return (
                   <Fragment key={t.id}>
                     <tr className="hover:bg-slate-50">
-                      <td className="px-3 py-2 text-slate-600">{formatDate(t.created_at, true)}</td>
-                      <td className="px-3 py-2">
+                      <td className="whitespace-nowrap px-3 py-2 text-slate-600">{formatDate(t.created_at, true)}</td>
+                      <td className="whitespace-nowrap px-3 py-2">
                         <span className={cn("font-medium", meta.cls)}>{meta.label}</span>
                         {voided && <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500">已撤销</span>}
                       </td>
-                      <td className="px-3 py-2 text-slate-700">
+                      <td className="whitespace-nowrap px-3 py-2 text-slate-700">
                         {t.student_name ?? "未知学员"}
                         {t.student_code && <span className="ml-1 font-mono text-[11px] text-slate-400">{t.student_code}</span>}
                       </td>
-                      <td className="px-3 py-2 text-slate-600">{t.description ?? "无备注"}</td>
-                      <td className={cn("px-3 py-2 text-right tabular-nums", meta.cls)}>{formatCurrency(t.amount)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-slate-500">
-                        {lockedCourseEvent
-                          ? <span className="text-blue-600">不影响钱包余额</span>
+                      <td className="truncate whitespace-nowrap px-3 py-2 text-slate-600" title={t.description ?? "无备注"}>{t.description ?? "无备注"}</td>
+                      <td className={cn("whitespace-nowrap px-3 py-2 text-right tabular-nums", meta.cls)}>{formatCurrency(t.amount)}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-right text-xs tabular-nums text-slate-500">
+                        {metadata.available_before !== undefined && metadata.available_after !== undefined
+                          ? <>
+                              可用 {formatCurrency(Number(metadata.available_before))} →{" "}
+                              <span className="text-slate-800">{formatCurrency(Number(metadata.available_after))}</span>
+                              <div className="text-[11px] text-blue-600">
+                                预付款 {formatCurrency(Number(metadata.frozen_before ?? 0))} →{" "}
+                                {formatCurrency(Number(metadata.frozen_after ?? 0))}
+                              </div>
+                            </>
                           : <>{formatCurrency(t.balance_before)} → <span className="text-slate-800">{formatCurrency(t.balance_after)}</span></>}
                       </td>
                       <td className="px-3 py-2 text-right">
@@ -256,7 +291,7 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
                               <Info label="说明" value={t.description ?? "无备注"} />
                             </dl>
                             <div className="flex items-start justify-end">
-                              {!lockedCourseEvent && !voided && <Gate keys="finance.refund">
+                              {!sourceManaged && !voided && <Gate keys="finance.refund">
                                 <button
                                   onClick={() => requestTxnDelete(t)}
                                   className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 px-3 text-xs font-medium text-red-600 hover:bg-red-50"
@@ -265,9 +300,9 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
                                   撤销流水（提交审批）
                                 </button>
                               </Gate>}
-                              {lockedCourseEvent && (
+                              {sourceManaged && (
                                 <span className="rounded bg-blue-50 px-2.5 py-1.5 text-xs text-blue-600">
-                                  课程联动流水，请在课程记录中修改
+                                  业务联动流水，请从对应报名、考勤、转课或退课记录处理
                                 </span>
                               )}
                             </div>
@@ -308,6 +343,37 @@ function Info({ label, value }: { label: string; value: string }) {
 function isCourseContractMetadata(metadata: unknown): boolean {
   return Boolean(metadata && typeof metadata === "object" && "domain" in metadata
     && (metadata as { domain?: unknown }).domain === "course_contract");
+}
+
+function transactionMetadata(metadata: unknown): Record<string, unknown> {
+  return metadata && typeof metadata === "object"
+    ? metadata as Record<string, unknown>
+    : {};
+}
+
+function isSourceManagedTransaction(transaction: Transaction): boolean {
+  const metadata = transactionMetadata(transaction.metadata);
+  return isCourseContractMetadata(transaction.metadata)
+    || ["prepayment", "income", "gift", "course_transfer"].includes(String(metadata.domain ?? ""))
+    || ["consumption_log", "lesson_lot", "enrollment_drop", "enrollment_transfer"].includes(
+      transaction.reference_type ?? "",
+    );
+}
+
+function financeChangeText(transaction: Transaction): string {
+  const metadata = transactionMetadata(transaction.metadata);
+  if (metadata.available_before !== undefined && metadata.available_after !== undefined) {
+    return `可用余额 ${formatCurrency(Number(metadata.available_before))} → ${formatCurrency(Number(metadata.available_after))}；锁定预付款 ${formatCurrency(Number(metadata.frozen_before ?? 0))} → ${formatCurrency(Number(metadata.frozen_after ?? 0))}；总余额 ${formatCurrency(transaction.balance_before)} → ${formatCurrency(transaction.balance_after)}`;
+  }
+  return `总余额 ${formatCurrency(transaction.balance_before)} → ${formatCurrency(transaction.balance_after)}`;
+}
+
+function visualTextWidth(value: string, fontSize: number, padding: number): number {
+  let units = 0;
+  for (const character of value) {
+    units += /[\u2E80-\u9FFF\uF900-\uFAFF]/.test(character) ? 1 : 0.56;
+  }
+  return Math.ceil(units * fontSize + padding);
 }
 
 function isVoidedMetadata(metadata: unknown): boolean {

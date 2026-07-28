@@ -6,8 +6,9 @@ import { Wallet } from "lucide-react";
 import { Field, inputCls, textareaCls } from "@/components/ui/form";
 import { StudentPicker } from "./student-picker";
 import { recharge } from "@/lib/api/create";
+import { listActiveCourseOptions } from "@/lib/api/courses-client";
 import { formatCurrency } from "@/lib/format";
-import type { StudentSearchResult } from "@/lib/api/courses";
+import type { ActiveCourseOption, StudentSearchResult } from "@/lib/api/courses";
 
 const PAY_METHODS = [
   { value: "shouqianba", label: "收钱吧" },
@@ -26,6 +27,8 @@ export function RechargeForm({ initialStudent = null }: { initialStudent?: Stude
   const [bonus, setBonus] = useState("0");
   const [ref, setRef] = useState("");
   const [notes, setNotes] = useState("");
+  const [courseId, setCourseId] = useState("");
+  const [courses, setCourses] = useState<ActiveCourseOption[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -33,6 +36,12 @@ export function RechargeForm({ initialStudent = null }: { initialStudent?: Stude
   useEffect(() => {
     setStudent(initialStudent);
   }, [initialStudent]);
+
+  useEffect(() => {
+    void listActiveCourseOptions()
+      .then(setCourses)
+      .catch((caught) => setError((caught as Error).message));
+  }, []);
 
   const clearStudentContext = () => {
     setStudent(null);
@@ -46,6 +55,7 @@ export function RechargeForm({ initialStudent = null }: { initialStudent?: Stude
     if (!student) return setError("请选择学员");
     const n = toMoney(Number(amount));
     if (!n || n <= 0) return setError("充值金额必须大于 0");
+    if (!notes.trim()) return setError("充值用途或原因必填");
     setSubmitting(true);
     setError(null);
     setInfo(null);
@@ -56,7 +66,8 @@ export function RechargeForm({ initialStudent = null }: { initialStudent?: Stude
         p_payment_method: method,
         p_bonus_amount: toMoney(Number(bonus) || 0),
         p_payment_ref: ref.trim() || null,
-        p_notes: notes.trim() || null,
+        p_notes: notes.trim(),
+        p_course_id: courseId || null,
       });
       setInfo(`已为 ${student.name} 充值 ${formatCurrency(n)}`);
       clearStudentContext();
@@ -64,6 +75,7 @@ export function RechargeForm({ initialStudent = null }: { initialStudent?: Stude
       setBonus("0");
       setRef("");
       setNotes("");
+      setCourseId("");
       router.refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -126,9 +138,22 @@ export function RechargeForm({ initialStudent = null }: { initialStudent?: Stude
             placeholder="如 微信交易号"
           />
         </Field>
+        <Field label="充值用途课程">
+          <select className={inputCls} value={courseId} onChange={(event) => setCourseId(event.target.value)}>
+            <option value="">通用账户余额</option>
+            {courses.map((course) => (
+              <option key={course.id} value={course.id}>{course.name}</option>
+            ))}
+          </select>
+        </Field>
       </div>
-      <Field label="备注">
-        <textarea className={textareaCls} value={notes} onChange={(e) => setNotes(e.target.value)} />
+      <Field label="充值用途 / 原因" required>
+        <textarea
+          className={textareaCls}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="如：中国舞 4 级班续费 / 补足追加报名预付款"
+        />
       </Field>
       {error && <div className="rounded bg-red-50 px-3 py-1.5 text-xs text-red-600">{error}</div>}
       {info && <div className="rounded bg-emerald-50 px-3 py-1.5 text-xs text-emerald-700">{info}</div>}
