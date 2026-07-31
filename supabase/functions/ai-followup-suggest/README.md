@@ -1,30 +1,11 @@
-# Edge Function: ai-followup-suggest
+# AI 跟进建议 Edge Function（已合并）
 
-**状态**: 占位 (源码未实现)。前端通过 `/api/ai/recommend-followup` 路由请求 AI 推荐跟进话术；该路由当前返回 501 + 合约文档。
+原独立函数方案已合并到统一的 `ai-assistant` Edge Function，避免多个函数重复管理 DeepSeek 密钥、鉴权和结构化输出逻辑。
 
-## 何时实现
+现有调用入口：
 
-当：
-1. 已选择 LLM 提供商（Claude / GPT / 本地模型）
-2. 已配置密钥到 Supabase Function 环境变量
-3. 已确认 token 使用预算与缓存策略
+- 网页同源接口：`POST /api/ai/recommend-followup?student_id=<uuid>`
+- Edge Function 动作：`followup_suggest`
+- Secret：`API_KEY`
 
-## 设计
-
-输入：`{ student_id: UUID }` →
-1. Edge Function 内部调 `rpc_get_student_signals(student_id)` 拿到学员画像 JSON
-2. 拼 prompt（system + signals + 历史跟进 timeline 截短）
-3. 调 LLM API
-4. 解析输出为 `{ suggested_type, suggested_content, suggested_next_plan, suggested_next_date, reasoning, confidence, model }`
-5. （可选）把结果回写到 `flup_records.metadata` 当作 AI 草稿，待顾问审核后调 `rpc_create_followup` 落地
-
-输出格式与 `admin/app/api/ai/recommend-followup/route.ts` 中 `CONTRACT.response.schema` 严格一致。
-
-## 部署
-
-```bash
-supabase functions deploy ai-followup-suggest --project-ref ra-supabase-v36yaxpmwwluvn \
-  --no-verify-jwt   # 当前 MVP, 后期开启
-```
-
-前端 `/api/ai/recommend-followup` 改为 `await sb.functions.invoke('ai-followup-suggest', { body: { student_id } })`。
+具体鉴权、部署和测试说明见 `../ai-assistant/README.md`。

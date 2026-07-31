@@ -9,6 +9,8 @@ supabase functions deploy students-create --project-ref ra-supabase-v36yaxpmwwlu
 supabase functions deploy courses-create  --project-ref ra-supabase-v36yaxpmwwluvn
 ```
 
+需要第三方模型密钥的 AI 功能统一部署为 `ai-assistant`。该函数从 Edge Function Secret `API_KEY` 读取 DeepSeek 密钥，应用容器和浏览器均不保存密钥。RDS Agent Runtime 环境通过函数管理接口上传 `supabase/functions/ai-assistant/index.ts`。
+
 部署后，前端通过 `supabase.functions.invoke('students-create', { body })` 调用。
 
 如果未部署，前端自动回退到直接调用 RPC（参见 `admin/lib/api/create.ts`）。

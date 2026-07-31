@@ -22,7 +22,7 @@ export default async function FollowupsPage({ searchParams }: { searchParams: { 
         queryParam="tab"
         tabs={[
           { key: "smart", label: "智能跟进系统", content: <FollowupsShell overview={overview} /> },
-          { key: "ai", label: "AI 知识图谱话术", content: <AiFollowupWorkbench overview={overview} configured={Boolean(process.env.DEEPSEEK_API_KEY)} model={process.env.DEEPSEEK_MODEL ?? "deepseek-v4-flash"} /> },
+          { key: "ai", label: "AI 知识图谱话术", content: <AiFollowupWorkbench overview={overview} model="deepseek-v4-flash" /> },
         ]}
       />
     </div>

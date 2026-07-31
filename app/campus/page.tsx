@@ -53,7 +53,7 @@ export default async function CampusPage({ searchParams }: PageProps) {
           {
             key: "kpi",
             label: "校区 KPI",
-            content: <CampusKpiDashboard data={kpis} aiConfigured={Boolean(process.env.DEEPSEEK_API_KEY)} aiModel={process.env.DEEPSEEK_MODEL ?? "deepseek-v4-flash"} />,
+            content: <CampusKpiDashboard data={kpis} aiModel="deepseek-v4-flash" />,
           },
         ]}
       />

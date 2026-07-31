@@ -1,9 +1,23 @@
+"use client";
+
+import { useState } from "react";
 import { Activity, Bot, CalendarCheck, MessageSquareText, Wallet } from "lucide-react";
 import type { CampusKpis } from "@/lib/api/campus-kpis";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { ROLE_LABELS } from "@/lib/permissions";
 
-export function CampusKpiDashboard({ data, aiConfigured, aiModel }: { data: CampusKpis; aiConfigured: boolean; aiModel: string }) {
+interface CampusAnalysis {
+  summary: string;
+  highlights: string[];
+  risks: string[];
+  actions: Array<{ title: string; owner_role: string; due_in_days: number; reason: string }>;
+  confidence: number;
+}
+
+export function CampusKpiDashboard({ data, aiModel }: { data: CampusKpis; aiModel: string }) {
+  const [analysis, setAnalysis] = useState<CampusAnalysis | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
   const totals = data.daily.reduce((sum, day) => ({
     followups: sum.followups + Number(day.followups),
     attendance: sum.attendance + Number(day.attendance_actions),
@@ -15,6 +29,26 @@ export function CampusKpiDashboard({ data, aiConfigured, aiModel }: { data: Camp
   const staff = [...data.staff].sort((a, b) => (
     b.followup_actions + b.attendance_actions - a.followup_actions - a.attendance_actions
   ));
+
+  const runAnalysis = async () => {
+    setAnalyzing(true);
+    setAnalysisError(null);
+    setAnalysis(null);
+    try {
+      const response = await fetch("/api/ai/campus-analysis", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ from: data.period.from, to: data.period.to }),
+      });
+      const payload = await response.json() as { error?: string; result?: CampusAnalysis };
+      if (!response.ok || !payload.result) throw new Error(payload.error ?? "AI 校区分析失败");
+      setAnalysis(payload.result);
+    } catch (caught) {
+      setAnalysisError((caught as Error).message);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -86,9 +120,26 @@ export function CampusKpiDashboard({ data, aiConfigured, aiModel }: { data: Camp
         <div className="flex items-start gap-3">
           <Bot className="mt-0.5 h-5 w-5 text-violet-600" />
           <div className="flex-1">
-            <h3 className="text-sm font-semibold text-violet-900">AI 校区经营分析（预留）</h3>
-            <p className="mt-1 text-xs leading-5 text-violet-700">将基于当前 KPI、学员知识图谱、课消和跟进记录生成管理摘要、异常人员提醒与行动建议。当前模型：{aiModel}。</p>
-            <div className="mt-3 rounded-lg bg-white/80 px-3 py-2 text-xs text-slate-600">API Key：{aiConfigured ? "已由服务端环境变量配置" : "待配置 DEEPSEEK_API_KEY=sk-..."}</div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-violet-900">AI 校区经营分析</h3>
+                <p className="mt-1 text-xs leading-5 text-violet-700">基于当前日期范围内的 KPI 生成经营摘要、风险提醒与行动建议。模型：{aiModel}，密钥由 Edge Function 安全托管。</p>
+              </div>
+              <button type="button" onClick={runAnalysis} disabled={analyzing} className="inline-flex h-9 items-center gap-2 rounded-md bg-violet-600 px-4 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-50"><Bot className="h-4 w-4" />{analyzing ? "分析中…" : "生成经营分析"}</button>
+            </div>
+            {analysisError && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{analysisError}</div>}
+            {analysis && <div className="mt-4 space-y-4 rounded-xl bg-white/90 p-4 text-sm text-slate-700">
+              <div className="leading-6">{analysis.summary}</div>
+              <div className="grid gap-3 lg:grid-cols-2">
+                <AnalysisList title="经营亮点" items={analysis.highlights} color="emerald" />
+                <AnalysisList title="风险提醒" items={analysis.risks} color="amber" />
+              </div>
+              {analysis.actions.length > 0 && <div>
+                <div className="text-xs font-semibold text-slate-700">建议行动</div>
+                <div className="mt-2 grid gap-2">{analysis.actions.map((action, index) => <div key={`${action.title}-${index}`} className="rounded-lg border border-slate-100 p-3"><div className="flex flex-wrap justify-between gap-2"><span className="font-medium text-slate-800">{action.title}</span><span className="text-xs text-slate-400">{action.owner_role} · {action.due_in_days} 天内</span></div><div className="mt-1 text-xs leading-5 text-slate-500">{action.reason}</div></div>)}</div>
+              </div>}
+              <div className="text-right text-xs text-slate-400">分析置信度 {Math.round(analysis.confidence * 100)}% · 需管理人员核对后执行</div>
+            </div>}
           </div>
         </div>
       </section>
@@ -101,3 +152,4 @@ function Metric({ Icon, label, value, unit = "" }: { Icon: typeof Activity; labe
 function Header({ title, sub }: { title: string; sub: string }) { return <div className="border-b border-slate-100 px-4 py-3"><h3 className="text-sm font-semibold text-slate-800">{title}</h3><p className="mt-0.5 text-xs text-slate-400">{sub}</p></div>; }
 function Th({ children }: { children: React.ReactNode }) { return <th className="whitespace-nowrap px-3 py-2 text-left font-medium">{children}</th>; }
 function Td({ children, strong = false }: { children: React.ReactNode; strong?: boolean }) { return <td className={`whitespace-nowrap px-3 py-2.5 ${strong ? "font-medium text-slate-800" : "text-slate-600"}`}>{children}</td>; }
+function AnalysisList({ title, items, color }: { title: string; items: string[]; color: "emerald" | "amber" }) { return <div><div className="text-xs font-semibold text-slate-700">{title}</div><div className="mt-2 space-y-1.5">{items.length === 0 ? <div className="text-xs text-slate-400">暂无明确项目</div> : items.map((item) => <div key={item} className={`rounded-lg px-3 py-2 text-xs leading-5 ${color === "emerald" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{item}</div>)}</div></div>; }

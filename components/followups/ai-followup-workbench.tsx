@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Bot, BrainCircuit, CircleDollarSign, GraduationCap, MessageSquareText, ShieldAlert, Sparkles } from "lucide-react";
 import type { FollowupOverview } from "@/lib/api/followups";
-import { cn } from "@/lib/utils";
 
 interface OntologyPreview {
   signals?: {
@@ -17,6 +16,16 @@ interface OntologyPreview {
   followup_history?: unknown[];
 }
 
+interface FollowupSuggestion {
+  suggested_type: "phone" | "wechat" | "visit" | "other";
+  suggested_content: string;
+  suggested_next_plan: string;
+  suggested_next_date: string | null;
+  reasoning: string;
+  risk_summary: string[];
+  confidence: number;
+}
+
 const RISK_LABELS: Record<string, string> = {
   low_balance: "余额偏低",
   balance_runway_short: "余额预计不足两周",
@@ -26,9 +35,17 @@ const RISK_LABELS: Record<string, string> = {
   attendance_below_70: "近三十天出勤率低于 70%",
 };
 
-export function AiFollowupWorkbench({ overview, configured, model }: { overview: FollowupOverview; configured: boolean; model: string }) {
+const FOLLOWUP_TYPE_LABELS: Record<FollowupSuggestion["suggested_type"], string> = {
+  phone: "电话",
+  wechat: "微信",
+  visit: "到访",
+  other: "其他",
+};
+
+export function AiFollowupWorkbench({ overview, model }: { overview: FollowupOverview; model: string }) {
   const [studentId, setStudentId] = useState(overview.students[0]?.student_id ?? "");
   const [ontology, setOntology] = useState<OntologyPreview | null>(null);
+  const [suggestion, setSuggestion] = useState<FollowupSuggestion | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const student = overview.students.find((item) => item.student_id === studentId);
@@ -37,13 +54,16 @@ export function AiFollowupWorkbench({ overview, configured, model }: { overview:
     if (!studentId) return;
     setLoading(true);
     setMessage(null);
+    setSuggestion(null);
     try {
       const response = await fetch(`/api/ai/recommend-followup?student_id=${studentId}`, { method: "POST" });
-      const value = await response.json() as { message?: string; ontology?: OntologyPreview };
+      const value = await response.json() as { error?: string; message?: string; ontology?: OntologyPreview; result?: FollowupSuggestion };
+      if (!response.ok) throw new Error(value.error ?? "AI 分析失败");
       setOntology(value.ontology ?? null);
-      setMessage(value.message ?? (response.ok ? "分析输入已准备" : "AI 服务尚未启用"));
+      setSuggestion(value.result ?? null);
+      setMessage(value.message ?? "AI 分析已生成，请核对后使用");
     } catch (caught) {
-      setMessage(`读取智能档案失败：${(caught as Error).message}`);
+      setMessage(`AI 分析失败：${(caught as Error).message}`);
     } finally {
       setLoading(false);
     }
@@ -60,18 +80,18 @@ export function AiFollowupWorkbench({ overview, configured, model }: { overview:
         </div>
         <div className="rounded-lg bg-white/80 px-4 py-3 text-xs text-slate-600">
           <div>模型：<span className="font-medium text-slate-800">{model}</span></div>
-          <div className={cn("mt-1", configured ? "text-emerald-600" : "text-amber-600")}>API Key：{configured ? "服务端已配置" : "待配置 DEEPSEEK_API_KEY"}</div>
+          <div className="mt-1 text-emerald-600">密钥：由 Edge Function 安全托管</div>
         </div>
       </section>
 
       <div className="grid gap-5 xl:grid-cols-[320px_1fr]">
         <section className="rounded-xl border border-slate-200 p-4">
           <label className="text-xs text-slate-500">选择分析学员</label>
-          <select value={studentId} onChange={(event) => { setStudentId(event.target.value); setOntology(null); setMessage(null); }} className="mt-1 h-10 w-full rounded border border-slate-200 px-3 text-sm">
+          <select value={studentId} onChange={(event) => { setStudentId(event.target.value); setOntology(null); setSuggestion(null); setMessage(null); }} className="mt-1 h-10 w-full rounded border border-slate-200 px-3 text-sm">
             {overview.students.map((item) => <option key={item.student_id} value={item.student_id}>{item.student_name} · {item.student_code ?? "无编号"}</option>)}
           </select>
           {student && <div className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600"><div>课程顾问：{student.counselor_name ?? "未分配"}</div><div>历史跟进：{student.record_count} 条</div><div>距上次跟进：{student.days_since_last == null ? "从未跟进" : `${student.days_since_last} 天`}</div></div>}
-          <button type="button" onClick={prepare} disabled={!studentId || loading} className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-violet-600 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"><Sparkles className="h-4 w-4" />{loading ? "整理档案中…" : "生成推进话术"}</button>
+          <button type="button" onClick={prepare} disabled={!studentId || loading} className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-violet-600 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"><Sparkles className="h-4 w-4" />{loading ? "AI 分析中…" : "生成推进话术"}</button>
           {message && <div className="mt-3 rounded-lg bg-violet-50 p-3 text-xs leading-5 text-violet-700">{message}</div>}
         </section>
 
@@ -90,8 +110,16 @@ export function AiFollowupWorkbench({ overview, configured, model }: { overview:
                 <div className="mt-3 flex flex-wrap gap-2">{risks.length === 0 ? <span className="text-xs text-emerald-600">当前未识别明显风险</span> : risks.map((risk) => <span key={risk} className="rounded-full bg-amber-100 px-2.5 py-1 text-xs text-amber-700">{RISK_LABELS[risk] ?? "其他需关注信号"}</span>)}</div>
               </div>
               <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
-                <div className="text-sm font-medium text-violet-900">推进话术输出区（预留）</div>
-                <p className="mt-2 text-sm leading-6 text-violet-700">接通模型后将在这里显示：推荐联系渠道、可直接复用的话术、下一步计划、推荐跟进日期，以及每条建议引用的知识图谱依据。</p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-sm font-medium text-violet-900">AI 推进话术</div>
+                  {suggestion && <span className="rounded-full bg-white px-2.5 py-1 text-xs text-violet-700">建议渠道：{FOLLOWUP_TYPE_LABELS[suggestion.suggested_type] ?? "其他"} · 置信度 {Math.round(suggestion.confidence * 100)}%</span>}
+                </div>
+                {!suggestion ? <p className="mt-2 text-sm leading-6 text-violet-700">生成后将在这里显示联系渠道、话术、下一步计划、建议日期和分析依据。</p> : <div className="mt-3 space-y-3 text-sm leading-6 text-violet-900">
+                  <div className="rounded-lg bg-white/80 p-3 whitespace-pre-wrap">{suggestion.suggested_content}</div>
+                  <div><span className="font-medium">下一步：</span>{suggestion.suggested_next_plan}{suggestion.suggested_next_date ? `（建议 ${suggestion.suggested_next_date} 跟进）` : ""}</div>
+                  <div className="text-xs text-violet-700"><span className="font-medium">分析依据：</span>{suggestion.reasoning || "模型未提供额外依据"}</div>
+                  {suggestion.risk_summary.length > 0 && <div className="flex flex-wrap gap-2">{suggestion.risk_summary.map((risk) => <span key={risk} className="rounded-full bg-amber-100 px-2.5 py-1 text-xs text-amber-700">{risk}</span>)}</div>}
+                </div>}
               </div>
             </div>
           )}
