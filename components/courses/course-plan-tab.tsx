@@ -7,9 +7,9 @@ import { TimeRangeInput } from "@/components/courses/time-range-input";
 import { listCourseSessions, updateCourseInfo, type CourseSessionSummary } from "@/lib/api/courses-client";
 import { lessonProgress } from "@/lib/course-lifecycle";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { formatTimeRange, isValidTimeRange, parseTimeRange } from "@/lib/schedule";
+import { formatTimeRange, formatWeekday, isValidTimeRange, parseTimeRange } from "@/lib/schedule";
 import type { CourseRow } from "@/lib/api/courses";
-import type { Department } from "@/lib/api/lookups";
+import type { Department, HomeroomTeacher } from "@/lib/api/lookups";
 
 const WEEKDAYS = [
   { value: "mon", label: "周一" },
@@ -21,7 +21,7 @@ const WEEKDAYS = [
   { value: "sun", label: "周日" },
 ];
 
-export function CoursePlanTab({ course, departments, canEdit, onMutate }: { course: CourseRow; departments: Department[]; canEdit: boolean; onMutate: () => Promise<void> }) {
+export function CoursePlanTab({ course, departments, homeroomTeachers, canEdit, onMutate }: { course: CourseRow; departments: Department[]; homeroomTeachers: HomeroomTeacher[]; canEdit: boolean; onMutate: () => Promise<void> }) {
   const progress = lessonProgress(course);
   const [totalLessons, setTotalLessons] = useState(String(course.total_lessons ?? ""));
   const [unitPrice, setUnitPrice] = useState(String(course.fee ?? ""));
@@ -33,6 +33,7 @@ export function CoursePlanTab({ course, departments, canEdit, onMutate }: { cour
   const [startTime, setStartTime] = useState(initialTime.start);
   const [endTime, setEndTime] = useState(initialTime.end);
   const [teacherName, setTeacherName] = useState(course.schedule_info?.teacher_name ?? "");
+  const [homeroomTeacherId, setHomeroomTeacherId] = useState(course.homeroom_teacher_id ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -50,6 +51,7 @@ export function CoursePlanTab({ course, departments, canEdit, onMutate }: { cour
     setStartTime(nextTime.start);
     setEndTime(nextTime.end);
     setTeacherName(course.schedule_info?.teacher_name ?? "");
+    setHomeroomTeacherId(course.homeroom_teacher_id ?? "");
   }, [course]);
 
   useEffect(() => {
@@ -85,6 +87,7 @@ export function CoursePlanTab({ course, departments, canEdit, onMutate }: { cour
         weekdays,
         time: formatTimeRange(startTime, endTime),
         teacherName: teacherName.trim(),
+        homeroomTeacherId: homeroomTeacherId || null,
       });
       setSaved(true);
       await onMutate();
@@ -136,7 +139,7 @@ export function CoursePlanTab({ course, departments, canEdit, onMutate }: { cour
               >
                 <MapPin className="h-2.5 w-2.5" />
                 <span className={`pointer-events-none absolute bottom-7 z-30 hidden w-64 rounded-lg bg-slate-900 p-3 text-left text-xs font-normal leading-5 text-white shadow-xl group-hover:block ${tooltipPosition}`}>
-                  <span className="block font-medium">{formatDate(session.class_date)} · {course.schedule_info?.time || "时间未设"}</span>
+                  <span className="block font-medium">{formatDate(session.class_date)}（{formatWeekday(session.class_date)}） · {course.schedule_info?.time || "时间未设"}</span>
                   <span className="mt-1 block text-slate-200">到课 {session.attended}/{session.headcount} 人（正常 {session.present ?? session.attended} · 迟到 {session.late ?? 0} · 缺席 {session.absent ?? 0} · 请假 {session.leave ?? 0}）</span>
                   <span className="block text-slate-200">消课 {session.consumed_lessons ?? 0} 课时 · {formatCurrency(session.consumed_amount ?? 0)}</span>
                   {session.student_names && <span className="mt-1 block border-t border-slate-700 pt-1 text-slate-300">记录：{session.student_names}</span>}
@@ -152,7 +155,7 @@ export function CoursePlanTab({ course, departments, canEdit, onMutate }: { cour
           <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
             {sessions.map((session, index) => (
               <div key={session.class_date} className="shrink-0 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
-                <div className="font-medium text-slate-700">第 {index + 1} 节 · {formatDate(session.class_date)}</div>
+                <div className="font-medium text-slate-700">第 {index + 1} 节 · {formatDate(session.class_date)}（{formatWeekday(session.class_date)}）</div>
                 <div className="mt-0.5 text-slate-500">{course.schedule_info?.time || "时间未设"} · 到课 {session.attended}/{session.headcount} 人 · 消课 {session.consumed_lessons ?? 0} 课时</div>
               </div>
             ))}
@@ -190,6 +193,12 @@ export function CoursePlanTab({ course, departments, canEdit, onMutate }: { cour
             </Field>
             <Field label="老师姓名" className="md:col-span-2">
               <input className={inputCls} value={teacherName} onChange={(event) => setTeacherName(event.target.value)} placeholder="请输入授课老师姓名" />
+            </Field>
+            <Field label="班主任" className="md:col-span-2">
+              <select className={inputCls} value={homeroomTeacherId} onChange={(event) => setHomeroomTeacherId(event.target.value)}>
+                <option value="">暂不分配</option>
+                {homeroomTeachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.display_name}</option>)}
+              </select>
             </Field>
             <Field label="上课星期" className="md:col-span-2">
               <div className="flex min-h-10 flex-wrap items-center gap-1.5">

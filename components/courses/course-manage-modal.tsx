@@ -6,7 +6,7 @@ import { X, Users, UserPlus, LogOut, CalendarCheck, Gauge } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { listCourseEnrollments } from "@/lib/api/courses-client";
 import type { CourseEnrollment, CourseRow } from "@/lib/api/courses";
-import type { Department } from "@/lib/api/lookups";
+import type { Department, HomeroomTeacher } from "@/lib/api/lookups";
 import { RosterTab } from "./roster-tab";
 import { EnrollTab } from "./enroll-tab";
 import { AttendanceTab } from "./attendance-tab";
@@ -19,6 +19,7 @@ interface Props {
   onClose: () => void;
   course: CourseRow;
   departments: Department[];
+  homeroomTeachers: HomeroomTeacher[];
   initialTab?: string;
   initialDate?: string;
 }
@@ -32,7 +33,7 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-export function CourseManageModal({ open, onClose, course, departments, initialTab, initialDate }: Props) {
+export function CourseManageModal({ open, onClose, course, departments, homeroomTeachers, initialTab, initialDate }: Props) {
   const { has } = usePermissions();
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>(() => TABS.some((item) => item.key === initialTab) ? initialTab as TabKey : "plan");
@@ -87,7 +88,7 @@ export function CourseManageModal({ open, onClose, course, departments, initialT
             <h2 className="text-lg font-semibold text-slate-900">{course.course_name}</h2>
             <p className="mt-0.5 text-xs text-slate-500">
               {course.subject ?? "未设科目"} · {course.level ?? "未设级别"} · 容量 {course.active_enrolled}/
-              {course.max_capacity ?? "∞"} · 标准课时单价 ¥{Number(course.fee).toLocaleString()}
+              {course.max_capacity ?? "∞"} · 标准课时单价 ¥{Number(course.fee).toLocaleString()} · 班主任 {course.homeroom_teacher_name ?? "未分配"}
             </p>
           </div>
           <button
@@ -142,7 +143,7 @@ export function CourseManageModal({ open, onClose, course, departments, initialT
           )}
           {!loading && !error && (
             <>
-              {tab === "plan" && <CoursePlanTab course={course} departments={departments} canEdit={has("courses.plan") || has("courses.update")} onMutate={handleMutation} />}
+              {tab === "plan" && <CoursePlanTab course={course} departments={departments} homeroomTeachers={homeroomTeachers} canEdit={has("courses.plan") || has("courses.update")} onMutate={handleMutation} />}
               {tab === "roster" && (
                 <RosterTab
                   enrollments={rosterEnrollments}

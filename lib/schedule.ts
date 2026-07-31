@@ -95,3 +95,8 @@ export function localDate(value: Date): string {
   const pad = (part: number) => String(part).padStart(2, "0");
   return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
 }
+
+export function formatWeekday(value: string): string {
+  const date = new Date(`${value.slice(0, 10)}T12:00:00`);
+  return ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][date.getDay()] ?? "";
+}

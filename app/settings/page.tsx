@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Users, ArrowRight } from "lucide-react";
+import { Users, ArrowRight, Bot } from "lucide-react";
 import { AccountManager } from "@/components/settings/account-manager";
 import { CompanyForm } from "@/components/settings/company-form";
 import { getCompany } from "@/lib/api/company";
@@ -51,6 +51,21 @@ export default async function SettingsPage() {
       </div>
 
       <AccountManager current={current} />
+
+      <section className="rounded-2xl bg-white p-5 shadow-card">
+        <div className="flex items-start gap-3">
+          <div className="grid h-10 w-10 place-items-center rounded-lg bg-violet-50 text-violet-600"><Bot className="h-5 w-5" /></div>
+          <div className="flex-1">
+            <h2 className="text-sm font-semibold text-slate-800">AI 分析服务（预留配置）</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-500">用于学员知识图谱分析、推进话术与校区管理分析。密钥只从服务端环境变量读取，不会保存到浏览器。</p>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <ConfigField label="模型" value={process.env.DEEPSEEK_MODEL ?? "deepseek-v4-flash"} />
+              <ConfigField label="接口地址" value={process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com"} />
+              <ConfigField label="API Key" value={process.env.DEEPSEEK_API_KEY ? "已配置（内容已隐藏）" : "待配置 DEEPSEEK_API_KEY=sk-..."} warning={!process.env.DEEPSEEK_API_KEY} />
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* 名下学员 */}
       <section className="rounded-2xl bg-white p-5 shadow-card">
@@ -105,4 +120,8 @@ export default async function SettingsPage() {
       )}
     </div>
   );
+}
+
+function ConfigField({ label, value, warning = false }: { label: string; value: string; warning?: boolean }) {
+  return <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"><div className="text-[11px] text-slate-400">{label}</div><div className={`mt-1 truncate text-xs font-medium ${warning ? "text-amber-600" : "text-slate-700"}`} title={value}>{value}</div></div>;
 }

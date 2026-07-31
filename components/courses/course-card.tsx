@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { CourseManageModal } from "./course-manage-modal";
 import type { CourseRow } from "@/lib/api/courses";
-import type { Department } from "@/lib/api/lookups";
+import type { Department, HomeroomTeacher } from "@/lib/api/lookups";
 import { canCompleteCourse, getCourseLifecycle, lessonProgress, type CourseLifecycle } from "@/lib/course-lifecycle";
 import { completeCourse, deleteCourse, setCompletedCourseArchived } from "@/lib/api/courses-client";
 import { Gate } from "@/lib/auth/permissions-context";
@@ -20,7 +20,7 @@ const STATUS: Record<CourseLifecycle, { label: string; cls: string; ring: string
   completed: { label: "已结课", cls: "bg-blue-50 text-blue-700", ring: "ring-blue-200" },
 };
 
-export function CourseCard({ course, departments, initialOpen = false, initialTab, initialDate }: { course: CourseRow; departments: Department[]; initialOpen?: boolean; initialTab?: string; initialDate?: string }) {
+export function CourseCard({ course, departments, homeroomTeachers, initialOpen = false, initialTab, initialDate }: { course: CourseRow; departments: Department[]; homeroomTeachers: HomeroomTeacher[]; initialOpen?: boolean; initialTab?: string; initialDate?: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(initialOpen);
@@ -92,6 +92,9 @@ export function CourseCard({ course, departments, initialOpen = false, initialTa
                 <span className="rounded bg-slate-100 px-1.5 py-0.5">{course.level ?? "未设级别"}</span>
                 {course.department_name && (
                   <span className="rounded bg-blue-50 px-1.5 py-0.5 text-blue-700">{course.department_name}</span>
+                )}
+                {course.homeroom_teacher_name && (
+                  <span className="rounded bg-violet-50 px-1.5 py-0.5 text-violet-700">班主任：{course.homeroom_teacher_name}</span>
                 )}
               </div>
             </div>
@@ -187,7 +190,7 @@ export function CourseCard({ course, departments, initialOpen = false, initialTa
           )}
         </div>
       </div>
-      <CourseManageModal open={open} onClose={closeModal} course={course} departments={departments} initialTab={initialTab} initialDate={initialDate} />
+      <CourseManageModal open={open} onClose={closeModal} course={course} departments={departments} homeroomTeachers={homeroomTeachers} initialTab={initialTab} initialDate={initialDate} />
     </>
   );
 }

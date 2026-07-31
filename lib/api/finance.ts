@@ -1,5 +1,6 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import type { StudentSearchResult } from "./courses";
+import { courseEventsForDate, localDate, type SchedulableCourse } from "@/lib/schedule";
 
 // ---------- 类型 ----------
 
@@ -35,13 +36,12 @@ export interface Transaction {
   student_code?: string | null;
   created_by_name?: string | null;
 }
-
 export interface FinanceKpis {
   recharge_mtd: number;
   refund_mtd: number;
-  consume_mtd: number;
-  prepayment_mtd: number;
-  net_mtd: number;
+  expected_consumption_mtd: number;
+  actual_consumption_mtd: number;
+  realized_income_mtd: number;
 }
 
 export interface ActiveEnrollment {
@@ -56,37 +56,67 @@ export interface ActiveEnrollment {
 
 export async function getFinanceKpis(): Promise<FinanceKpis> {
   const sb = createServerSupabase();
-  const { data, error } = await sb
-    .from("fin_transactions")
-    .select("type, amount, metadata, created_at")
-    .gte("created_at", monthStartIso())
-    .limit(10000);
-  if (error) throw error;
+  const now = new Date();
+  const from = localDate(new Date(now.getFullYear(), now.getMonth(), 1));
+  const to = localDate(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+  const fromIso = new Date(`${from}T00:00:00+08:00`).toISOString();
+  const toIso = new Date(`${to}T23:59:59.999+08:00`).toISOString();
+  const [transactionsRes, coursesRes, enrollmentsRes, consumptionRes] = await Promise.all([
+    sb.from("fin_transactions")
+      .select("type, amount, metadata, created_at")
+      .gte("created_at", fromIso).lte("created_at", toIso).limit(10000),
+    sb.from("v_course_stats")
+      .select("course_id,course_name,start_date,end_date,status,active_enrolled,schedule_info")
+      .eq("is_archived", false),
+    sb.from("crs_enrollments")
+      .select("course_id,unit_price")
+      .eq("status", "enrolled"),
+    sb.from("fin_consumption_logs")
+      .select("amount,created_at")
+      .gte("created_at", fromIso).lte("created_at", toIso).limit(20000),
+  ]);
+  if (transactionsRes.error) throw transactionsRes.error;
+  if (coursesRes.error) throw coursesRes.error;
+  if (enrollmentsRes.error) throw enrollmentsRes.error;
+  if (consumptionRes.error) throw consumptionRes.error;
   let r = 0,
     rf = 0,
-    c = 0,
-    prepayment = 0;
-  for (const row of (data ?? []) as { type: string; amount: number; metadata?: Record<string, unknown> | null }[]) {
+    realized = 0;
+  for (const row of (transactionsRes.data ?? []) as { type: string; amount: number; metadata?: Record<string, unknown> | null }[]) {
     if (row.metadata?.voided === true) continue;
     const n = Number(row.amount);
     if (row.type === "recharge") r += n;
     else if (row.type === "refund") rf += n;
-    else if (row.type === "consume") c += n;
-    if (
-      row.type === "prepayment_lock"
-      && row.metadata?.event !== "historical_lock_initialization"
-    ) prepayment += n;
-    if (row.type === "prepayment_release") prepayment -= n;
-    if (row.type === "prepayment_adjustment") {
-      prepayment += Number(row.metadata?.locked_delta ?? 0);
-    }
+    else if (row.type === "consume") realized += n;
   }
+
+  const scheduledValueByCourse = new Map<string, number>();
+  for (const enrollment of (enrollmentsRes.data ?? []) as Array<{ course_id: string; unit_price: number | null }>) {
+    scheduledValueByCourse.set(
+      enrollment.course_id,
+      (scheduledValueByCourse.get(enrollment.course_id) ?? 0) + Number(enrollment.unit_price ?? 0),
+    );
+  }
+  const courses = (coursesRes.data ?? []) as SchedulableCourse[];
+  let expected = 0;
+  const cursor = new Date(`${from}T12:00:00`);
+  const end = new Date(`${to}T12:00:00`);
+  while (cursor <= end) {
+    for (const event of courseEventsForDate(courses, localDate(cursor))) {
+      expected += scheduledValueByCourse.get(event.courseId) ?? 0;
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  const actual = (consumptionRes.data ?? []).reduce(
+    (sum, row) => sum + Number((row as { amount: number }).amount ?? 0),
+    0,
+  );
   return {
     recharge_mtd: r,
     refund_mtd: rf,
-    consume_mtd: c,
-    prepayment_mtd: prepayment,
-    net_mtd: r - rf,
+    expected_consumption_mtd: Math.round(expected * 100) / 100,
+    actual_consumption_mtd: Math.round(actual * 100) / 100,
+    realized_income_mtd: Math.round(realized * 100) / 100,
   };
 }
 
@@ -156,9 +186,4 @@ export async function getRechargeStudent(studentId?: string): Promise<StudentSea
     .maybeSingle();
   if (error) throw error;
   return (data as StudentSearchResult | null) ?? null;
-}
-
-function monthStartIso(): string {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 }

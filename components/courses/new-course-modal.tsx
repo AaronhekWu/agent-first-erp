@@ -10,11 +10,13 @@ import { searchStudents } from "@/lib/api/courses-client";
 import { formatTimeRange, isValidTimeRange } from "@/lib/schedule";
 import type { StudentSearchResult } from "@/lib/api/courses";
 import type { Department } from "@/lib/api/students";
+import type { HomeroomTeacher } from "@/lib/api/lookups";
 
 interface Props {
   open: boolean;
   onClose: () => void;
   departments: Department[];
+  homeroomTeachers: HomeroomTeacher[];
 }
 
 const WEEKDAYS = [
@@ -27,7 +29,7 @@ const WEEKDAYS = [
   { v: "sun", label: "周日" },
 ];
 
-export function NewCourseModal({ open, onClose, departments }: Props) {
+export function NewCourseModal({ open, onClose, departments, homeroomTeachers }: Props) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +48,7 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
   const [startTime, setStartTime] = useState("18:00");
   const [endTime, setEndTime] = useState("20:00");
   const [teacherName, setTeacherName] = useState("");
+  const [homeroomTeacherId, setHomeroomTeacherId] = useState("");
   const [studentQuery, setStudentQuery] = useState("");
   const [studentResults, setStudentResults] = useState<StudentSearchResult[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<StudentSearchResult[]>([]);
@@ -81,6 +84,7 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
     setStartTime("18:00");
     setEndTime("20:00");
     setTeacherName("");
+    setHomeroomTeacherId("");
     setStudentQuery("");
     setStudentResults([]);
     setSelectedStudents([]);
@@ -125,6 +129,7 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
         p_start_date: startDate || null,
         p_end_date: endDate || null,
         p_department_id: departmentId || null,
+        p_homeroom_teacher_id: homeroomTeacherId || null,
         p_schedule_info: {
           total_lessons: Number(totalLessons),
           weekdays: days,
@@ -206,6 +211,15 @@ export function NewCourseModal({ open, onClose, departments }: Props) {
             onChange={(e) => setTeacherName(e.target.value)}
             placeholder="请输入授课老师姓名"
           />
+        </Field>
+        <Field label="班主任" className="col-span-2">
+          <select className={inputCls} value={homeroomTeacherId} onChange={(event) => setHomeroomTeacherId(event.target.value)}>
+            <option value="">暂不分配</option>
+            {homeroomTeachers.map((teacher) => (
+              <option key={teacher.id} value={teacher.id}>{teacher.display_name}</option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-slate-400">班主任负责班级日常点名和学员联系；课程顾问仍负责学员归属。</p>
         </Field>
         <Field label="学科" required>
           <input

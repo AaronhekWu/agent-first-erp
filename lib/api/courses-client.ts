@@ -75,6 +75,7 @@ export async function updateCourseInfo(input: {
   weekdays: string[];
   time: string;
   teacherName: string;
+  homeroomTeacherId: string | null;
 }) {
   const sb = getSupabaseBrowser();
   const { data, error } = await sb.rpc("rpc_update_course_info", {
@@ -87,8 +88,9 @@ export async function updateCourseInfo(input: {
     p_weekdays: input.weekdays,
     p_class_time: input.time,
     p_teacher_name: input.teacherName,
+    p_homeroom_teacher_id: input.homeroomTeacherId,
   });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(error.message.replace(/^[A-Z][A-Z0-9_]*:\s*/, "").trim() || "保存课程信息失败");
   return data;
 }
 

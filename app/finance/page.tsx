@@ -41,11 +41,11 @@ export default async function FinancePage({ searchParams }: PageProps) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <KCard label="本月充值" value={kpis.recharge_mtd} Icon={Wallet} bg="bg-emerald-50" color="text-emerald-600" />
-        <KCard label="本月退费" value={kpis.refund_mtd} Icon={Undo2} bg="bg-amber-50" color="text-amber-600" />
-        <KCard label="本月消课" value={kpis.consume_mtd} Icon={Minus} bg="bg-red-50" color="text-red-500" />
-        <KCard label="本月净锁定预付款" value={kpis.prepayment_mtd} Icon={BookOpenCheck} bg="bg-blue-50" color="text-blue-600" />
-        <KCard label="本月现金净额" value={kpis.net_mtd} Icon={ListOrdered} bg="bg-violet-50" color="text-violet-600" />
+        <KCard label="本月充值" value={kpis.recharge_mtd} sub="到账充值流水" Icon={Wallet} bg="bg-emerald-50" color="text-emerald-600" />
+        <KCard label="本月退费" value={kpis.refund_mtd} sub="已执行退费流水" Icon={Undo2} bg="bg-amber-50" color="text-amber-600" />
+        <KCard label="本月应课消" value={kpis.expected_consumption_mtd} sub="排期 × 在读报名实际单价" Icon={BookOpenCheck} bg="bg-blue-50" color="text-blue-600" />
+        <KCard label="本月实课消" value={kpis.actual_consumption_mtd} sub="课消明细实际金额" Icon={Minus} bg="bg-red-50" color="text-red-500" />
+        <KCard label="本月实收入" value={kpis.realized_income_mtd} sub="有效收入流水，应与实课消对账" Icon={ListOrdered} bg="bg-violet-50" color="text-violet-600" />
       </div>
 
       <Tabs
@@ -62,7 +62,7 @@ export default async function FinancePage({ searchParams }: PageProps) {
   );
 }
 
-function KCard({ label, value, Icon, bg, color }: { label: string; value: number; Icon: typeof Wallet; bg: string; color: string }) {
+function KCard({ label, value, sub, Icon, bg, color }: { label: string; value: number; sub: string; Icon: typeof Wallet; bg: string; color: string }) {
   return (
     <div className="flex items-center gap-4 rounded-2xl bg-white p-5 shadow-card">
       <div className={cn("grid h-12 w-12 shrink-0 place-items-center rounded-xl", bg)}>
@@ -73,6 +73,7 @@ function KCard({ label, value, Icon, bg, color }: { label: string; value: number
         <div className="mt-0.5 truncate text-xl font-semibold tabular-nums text-slate-900">
           {formatCurrency(value)}
         </div>
+        <div className="mt-1 truncate text-[11px] text-slate-400" title={sub}>{sub}</div>
       </div>
     </div>
   );

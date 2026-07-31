@@ -32,6 +32,8 @@ interface Props {
 
 export function AttendanceTab({ enrollments, classDate, setClassDate, lessonLimitReached, onMutate }: Props) {
   const [picks, setPicks] = useState<Map<string, StatusKey>>(new Map());
+  const [lessonCounts, setLessonCounts] = useState<Map<string, number>>(new Map());
+  const [notes, setNotes] = useState<Map<string, string>>(new Map());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [doneCount, setDoneCount] = useState(0);
@@ -43,6 +45,8 @@ export function AttendanceTab({ enrollments, classDate, setClassDate, lessonLimi
       if (e.today_status) init.set(e.enrollment_id, e.today_status as StatusKey);
     }
     setPicks(init);
+    setLessonCounts(new Map(enrollments.map((enrollment) => [enrollment.enrollment_id, 1])));
+    setNotes(new Map());
     setDoneCount(0);
     setError(null);
   }, [classDate, enrollments]);
@@ -68,6 +72,21 @@ export function AttendanceTab({ enrollments, classDate, setClassDate, lessonLimi
   };
 
   const submit = async () => {
+    for (const enrollment of enrollments) {
+      if (enrollment.today_attendance_id) continue;
+      const status = picks.get(enrollment.enrollment_id);
+      if (!status) continue;
+      const lessonCount = lessonCounts.get(enrollment.enrollment_id) ?? 1;
+      const reason = notes.get(enrollment.enrollment_id)?.trim() ?? "";
+      if (status !== "present" && !reason) {
+        setError(`${enrollment.student_name}不是到课状态，必须填写原因`);
+        return;
+      }
+      if (lessonCount % 1 !== 0 && !reason) {
+        setError(`${enrollment.student_name}使用 0.5 课时异常调整，必须填写备注`);
+        return;
+      }
+    }
     setSubmitting(true);
     setError(null);
     setDoneCount(0);
@@ -77,12 +96,16 @@ export function AttendanceTab({ enrollments, classDate, setClassDate, lessonLimi
       if (e.today_attendance_id) continue; // skip already marked
       const s = picks.get(e.enrollment_id);
       if (!s) continue;
+      const lessonCount = lessonCounts.get(e.enrollment_id) ?? 1;
+      const note = notes.get(e.enrollment_id)?.trim() ?? "";
       try {
         await markAttendance({
           p_enrollment_id: e.enrollment_id,
           p_class_date: classDate,
           p_status: s,
           p_trigger_consume: s === "present" || s === "late",
+          p_lesson_count: lessonCount,
+          p_notes: note || null,
         });
         success += 1;
         setDoneCount(success);
@@ -131,13 +154,14 @@ export function AttendanceTab({ enrollments, classDate, setClassDate, lessonLimi
               <th className="px-3 py-2 text-left">学员</th>
               <th className="px-3 py-2 text-right">余额</th>
               <th className="px-3 py-2 text-center">剩余课时</th>
+              <th className="px-3 py-2 text-center">本次课时</th>
               <th className="px-3 py-2 text-left">考勤</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {enrollments.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-3 py-10 text-center text-sm text-slate-400">
+                <td colSpan={5} className="px-3 py-10 text-center text-sm text-slate-400">
                   暂无在读学员
                 </td>
               </tr>
@@ -161,6 +185,20 @@ export function AttendanceTab({ enrollments, classDate, setClassDate, lessonLimi
                   </td>
                   <td className="px-3 py-2 text-center text-slate-700">
                     {e.remaining_lessons ?? "∞"}
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <select
+                      value={lessonCounts.get(e.enrollment_id) ?? 1}
+                      disabled={isMarked || lessonLimitReached}
+                      onChange={(event) => setLessonCounts((current) => {
+                        const next = new Map(current);
+                        next.set(e.enrollment_id, Number(event.target.value));
+                        return next;
+                      })}
+                      className="h-8 rounded border border-slate-200 bg-white px-2 text-xs text-slate-700 disabled:opacity-60"
+                    >
+                      {[0.5, 1, 1.5, 2].map((value) => <option key={value} value={value}>{value} 课时</option>)}
+                    </select>
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex flex-wrap gap-1.5">
@@ -187,6 +225,18 @@ export function AttendanceTab({ enrollments, classDate, setClassDate, lessonLimi
                         <span className="ml-1 self-center text-[11px] text-slate-400">已记录</span>
                       )}
                     </div>
+                    {!isMarked && cur && (cur !== "present" || (lessonCounts.get(e.enrollment_id) ?? 1) % 1 !== 0) && (
+                      <input
+                        value={notes.get(e.enrollment_id) ?? ""}
+                        onChange={(event) => setNotes((current) => {
+                          const next = new Map(current);
+                          next.set(e.enrollment_id, event.target.value);
+                          return next;
+                        })}
+                        placeholder={cur !== "present" ? "必填：说明迟到/缺勤/请假原因" : "必填：说明 0.5 课时异常情况"}
+                        className="mt-2 h-8 w-full min-w-56 rounded border border-amber-200 bg-amber-50/50 px-2 text-xs outline-none focus:border-amber-400"
+                      />
+                    )}
                   </td>
                 </tr>
               );
@@ -197,7 +247,7 @@ export function AttendanceTab({ enrollments, classDate, setClassDate, lessonLimi
 
       <div className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3">
         <div className="text-xs text-slate-500">
-          到课/迟到自动扣 1 课时 · 缺勤/请假不扣课时
+          到课/迟到按所选课时扣减 · 非到课状态和 0.5 课时异常调整必须备注
           {doneCount > 0 && <span className="ml-3 text-emerald-600">已成功 {doneCount} 条</span>}
           {error && <span className="ml-3 text-red-600">错误：{error}</span>}
         </div>

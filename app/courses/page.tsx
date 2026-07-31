@@ -29,7 +29,7 @@ export default async function CoursesPage({ searchParams }: PageProps) {
     courses.filter((course) => Boolean(course.is_archived) === showArchived),
     sort,
   );
-  const { departments } = lookups;
+  const { departments, homeroomTeachers } = lookups;
   const archiveParams = new URLSearchParams();
   if (!showArchived) archiveParams.set("archived", "1");
   if (sort !== "default") archiveParams.set("sort", sort);
@@ -70,7 +70,7 @@ export default async function CoursesPage({ searchParams }: PageProps) {
             <Archive className="h-4 w-4" />
             {showArchived ? "返回课程管理" : "查看归档课程"}
           </Link>
-          {!showArchived && <Gate keys="courses.create"><NewCourseButton departments={departments} /></Gate>}
+          {!showArchived && <Gate keys="courses.create"><NewCourseButton departments={departments} homeroomTeachers={homeroomTeachers} /></Gate>}
         </div>
       </div>
 
@@ -97,6 +97,7 @@ export default async function CoursesPage({ searchParams }: PageProps) {
       <CourseList
         courses={displayCourses}
         departments={departments}
+        homeroomTeachers={homeroomTeachers}
         page={page}
         pageSize={pageSize}
         emptyMessage={showArchived ? "暂无归档课程" : "暂无课程，点击右上角「新增课程」创建第一门课"}

@@ -4,8 +4,9 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import { NewCourseModal } from "./new-course-modal";
 import type { Department } from "@/lib/api/students";
+import type { HomeroomTeacher } from "@/lib/api/lookups";
 
-export function NewCourseButton({ departments }: { departments: Department[] }) {
+export function NewCourseButton({ departments, homeroomTeachers }: { departments: Department[]; homeroomTeachers: HomeroomTeacher[] }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -17,7 +18,7 @@ export function NewCourseButton({ departments }: { departments: Department[] }) 
         <Plus className="h-4 w-4" />
         新增课程
       </button>
-      <NewCourseModal open={open} onClose={() => setOpen(false)} departments={departments} />
+      <NewCourseModal open={open} onClose={() => setOpen(false)} departments={departments} homeroomTeachers={homeroomTeachers} />
     </>
   );
 }

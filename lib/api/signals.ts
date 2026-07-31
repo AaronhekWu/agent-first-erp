@@ -44,6 +44,7 @@ export interface MonthCalendarDay {
     course_name: string;
     status: "present" | "absent" | "late" | "leave";
     notes: string | null;
+    lesson_count: number;
     marked_at: string;
     consumption_count: number;
     amount: number;

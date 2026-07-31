@@ -127,7 +127,7 @@ function AdminView({ data }: { data: Extract<Awaited<ReturnType<typeof getDashbo
       {data.access.courses && (
         <div className="grid gap-5 lg:grid-cols-2">
           <DailyScheduleTimeline courses={data.courses} date={localDate(new Date())} title="今日日常课程表" />
-          <Panel title={`${data.period.label}应消 / 实际课消人次`}>
+          <Panel title={`${data.period.label}应消 / 实消人次`}>
             <AttendanceCompletion expected={data.attendance.expected} actual={data.attendance.actual} ratio={data.attendance.ratio} />
           </Panel>
         </div>
@@ -203,14 +203,14 @@ function AttendanceCompletion({ expected, actual, ratio }: { expected: number; a
     <div className="space-y-5 px-5 py-6">
       <div className="grid grid-cols-3 gap-3 text-center">
         <div className="rounded-lg bg-slate-50 px-3 py-3"><div className="text-2xl font-semibold text-slate-800">{expected.toLocaleString("zh-CN")}</div><div className="mt-1 text-xs text-slate-500">应消人次</div></div>
-        <div className="rounded-lg bg-blue-50 px-3 py-3"><div className="text-2xl font-semibold text-blue-600">{actual.toLocaleString("zh-CN")}</div><div className="mt-1 text-xs text-slate-500">实际课消</div></div>
+        <div className="rounded-lg bg-blue-50 px-3 py-3"><div className="text-2xl font-semibold text-blue-600">{actual.toLocaleString("zh-CN")}</div><div className="mt-1 text-xs text-slate-500">实消人次</div></div>
         <div className="rounded-lg bg-emerald-50 px-3 py-3"><div className="text-2xl font-semibold text-emerald-600">{ratio}%</div><div className="mt-1 text-xs text-slate-500">完成占比</div></div>
       </div>
       <div>
         <div className="mb-1.5 flex justify-between text-xs text-slate-500"><span>完成进度</span><span>{actual} / {expected}</span></div>
         <div className="h-4 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-gradient-to-r from-blue-400 to-emerald-400 transition-all" style={{ width: `${displayRatio}%` }} /></div>
       </div>
-      <p className="text-[11px] leading-5 text-slate-400">应消人次按所选时段内课程排期 × 当前在读人数计算；实际课消统计到课与迟到记录。</p>
+      <p className="text-[11px] leading-5 text-slate-400">应消人次按所选时段内课程排期 × 当前在读人数计算；实消人次按到课与迟到考勤记录计数，不受 0.5 课时金额结算影响。</p>
     </div>
   );
 }
@@ -341,26 +341,28 @@ function CounselorView({ data }: { data: Extract<Awaited<ReturnType<typeof getDa
 
 /* ---------------- 教师 / 班主任 ---------------- */
 function TeacherView({ data }: { data: Extract<Awaited<ReturnType<typeof getDashboard>>, { role: "teacher" }> }) {
-  const pendingClasses = data.classes.filter((c) => c.pending_sessions > 0).length;
+  const pendingClasses = data.classes.filter((c) => c.today_pending).length;
   return (
     <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-3">
-        <Tile icon={BookOpen} label="我的班级" value={data.myClasses} href="/courses" />
+        <Tile icon={BookOpen} label="我的授课 / 管理班级" value={data.myClasses} href="/courses" />
         <Tile icon={GraduationCap} label="在读学员" value={data.classes.reduce((n, c) => n + c.active_enrolled, 0)} />
-        <Tile icon={Clock} label="待点名 / 有剩余课次的班级" value={pendingClasses} tone={pendingClasses > 0 ? "amber" : "slate"} />
+        <Tile icon={Clock} label="今日待点名班级" value={pendingClasses} tone={pendingClasses > 0 ? "amber" : "slate"} />
       </div>
       <Panel title="我的班级">
         <div className="divide-y divide-slate-100">
           {data.classes.length === 0 && <div className="px-5 py-10 text-center text-sm text-slate-400">你还没有带班</div>}
           {data.classes.map((c) => (
-            <Link key={c.course_id} href="/courses" className="flex items-center justify-between px-5 py-3 hover:bg-slate-50">
+            <Link key={c.course_id} href={c.today_pending ? `/courses?course=${c.course_id}&tab=attendance&date=${localDate(new Date())}` : `/courses?course=${c.course_id}`} className="flex items-center justify-between px-5 py-3 hover:bg-slate-50">
               <div className="min-w-0">
                 <div className="truncate text-sm font-medium text-slate-800">{c.name}</div>
-                <div className="text-xs text-slate-400">在读 {c.active_enrolled} 人 · 出勤率 {c.attendance_rate != null ? `${c.attendance_rate}%` : "暂无"}</div>
+                <div className="text-xs text-slate-400">{c.is_homeroom ? "班主任管理" : "授课教师"} · 在读 {c.active_enrolled} 人 · 出勤率 {c.attendance_rate != null ? `${c.attendance_rate}%` : "暂无"}</div>
               </div>
               <div className="shrink-0 text-xs">
-                {c.pending_sessions > 0 ? (
-                  <span className="rounded bg-amber-50 px-2 py-0.5 text-amber-600">剩 {c.pending_sessions} 课次待点名</span>
+                {c.today_pending ? (
+                  <span className="rounded bg-amber-50 px-2 py-0.5 text-amber-600">今日待点名</span>
+                ) : c.pending_sessions > 0 ? (
+                  <span className="rounded bg-slate-50 px-2 py-0.5 text-slate-500">剩 {c.pending_sessions} 课次</span>
                 ) : (
                   <span className="text-slate-400">已完成</span>
                 )}

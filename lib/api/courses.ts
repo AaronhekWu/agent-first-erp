@@ -12,6 +12,8 @@ export interface CourseRow {
   fee: number;
   department_id: string | null;
   department_name: string | null;
+  homeroom_teacher_id: string | null;
+  homeroom_teacher_name: string | null;
   description: string | null;
   schedule_info: {
     total_lessons?: number;

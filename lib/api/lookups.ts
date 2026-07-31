@@ -7,6 +7,8 @@ export interface Counselor {
   department_id: string | null;
 }
 
+export type HomeroomTeacher = Counselor;
+
 export interface Department {
   id: string;
   name: string;
@@ -22,6 +24,7 @@ export interface Role {
 
 export interface Lookups {
   counselors: Counselor[];
+  homeroomTeachers: HomeroomTeacher[];
   departments: Department[];
   roles: Role[];
   schools: string[];
@@ -32,9 +35,10 @@ export async function getLookups(): Promise<Lookups> {
   const sb = createServerSupabase();
   const { data, error } = await sb.rpc("rpc_get_lookups");
   if (error) throw error;
-  const v = (data ?? {}) as Partial<Lookups>;
+  const v = (data ?? {}) as Partial<Lookups> & { homeroom_teachers?: HomeroomTeacher[] };
   return {
     counselors: v.counselors ?? [],
+    homeroomTeachers: v.homeroom_teachers ?? v.homeroomTeachers ?? [],
     // 顶层(根)部门是公司主体, 不作为学员/课程的归属选项展示
     departments: (v.departments ?? []).filter((d) => d.parent_id !== null),
     roles: v.roles ?? [],

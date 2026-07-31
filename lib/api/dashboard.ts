@@ -33,6 +33,8 @@ export interface TeacherClass {
   active_enrolled: number;
   attendance_rate: number | null;
   pending_sessions: number;
+  is_homeroom: boolean;
+  today_pending: boolean;
 }
 
 export interface DailyFlow {
@@ -89,7 +91,7 @@ export async function getDashboard(
     audits: isAdmin || allowed.has("audits.view"),
   };
 
-  if (isAdmin || permissions.length > 0) {
+  if (isAdmin || (!["teacher", "counselor"].includes(role ?? "") && permissions.length > 0)) {
     const since = new Date(`${period.from}T00:00:00`);
     const until = new Date(`${period.to}T23:59:59.999`);
     const [summaryRes, apprRes, txRes, gradRes, courseRes, attendanceRes] = await Promise.all([
@@ -201,12 +203,27 @@ export async function getDashboard(
     const myId = userData.user?.id ?? "";
     const coursesRes = await sb
       .from("crs_courses")
-      .select("id,name")
-      .eq("teacher_id", myId)
+      .select("id,name,teacher_id,homeroom_teacher_id,start_date,end_date,schedule_info")
+      .or(`teacher_id.eq.${myId},homeroom_teacher_id.eq.${myId}`)
       .is("deleted_at", null)
       .neq("status", "archived");
-    const courses = (coursesRes.data ?? []) as { id: string; name: string }[];
+    const courses = (coursesRes.data ?? []) as Array<{
+      id: string; name: string; teacher_id: string | null; homeroom_teacher_id: string | null;
+      start_date: string | null; end_date: string | null; schedule_info: { weekdays?: string[] } | null;
+    }>;
     const ids = courses.map((c) => c.id);
+    const today = localDate(new Date());
+    const dayKey = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"][new Date(`${today}T12:00:00`).getDay()];
+    const markedCourseIds = new Set<string>();
+    if (ids.length > 0) {
+      const attendanceRes = await sb.from("crs_attendance")
+        .select("crs_enrollments!inner(course_id)")
+        .eq("class_date", today)
+        .in("crs_enrollments.course_id", ids);
+      for (const row of (attendanceRes.data ?? []) as unknown as Array<{ crs_enrollments?: { course_id?: string } }>) {
+        if (row.crs_enrollments?.course_id) markedCourseIds.add(row.crs_enrollments.course_id);
+      }
+    }
     const statsMap = new Map<string, { active_enrolled: number; attendance_rate: number | null; total_lessons: number | null; completed_sessions: number | null }>();
     if (ids.length > 0) {
       const statsRes = await sb
@@ -233,6 +250,14 @@ export async function getDashboard(
           active_enrolled: s?.active_enrolled ?? 0,
           attendance_rate: s?.attendance_rate ?? null,
           pending_sessions: Math.max((s?.total_lessons ?? 0) - (s?.completed_sessions ?? 0), 0),
+          is_homeroom: c.homeroom_teacher_id === myId,
+          today_pending: Boolean(
+            c.homeroom_teacher_id === myId
+            && c.schedule_info?.weekdays?.includes(dayKey)
+            && (!c.start_date || today >= c.start_date)
+            && (!c.end_date || today <= c.end_date)
+            && !markedCourseIds.has(c.id)
+          ),
         };
       }),
     };

@@ -30,6 +30,7 @@ export function AttendanceEditModal({
   const current = day.slots[index] ?? null;
   const [status, setStatus] = useState(current?.status ?? "present");
   const [notes, setNotes] = useState(current?.notes ?? "");
+  const [lessonCount, setLessonCount] = useState(String(current?.lesson_count ?? 1));
   const [triggerConsume, setTriggerConsume] = useState(true);
   const [enrollmentId, setEnrollmentId] = useState(eligibleEnrollments[0]?.enrollment_id ?? "");
   const [lessons, setLessons] = useState("1");
@@ -41,6 +42,7 @@ export function AttendanceEditModal({
     if (!current) return;
     setStatus(current.status);
     setNotes(current.notes ?? "");
+    setLessonCount(String(current.lesson_count ?? 1));
   }, [current]);
 
   const isMakeup = current && ["absent", "leave"].includes(current.status) && ["present", "late"].includes(status);
@@ -48,7 +50,12 @@ export function AttendanceEditModal({
 
   const submitEdit = async () => {
     if (!current) return;
-    if (isMakeup && !notes.trim()) return setError("补课消必须填写备注");
+    const nextLessons = Number(lessonCount);
+    if (!nextLessons || nextLessons <= 0 || !Number.isInteger(nextLessons * 2)) return setError("课时数必须大于 0 并按 0.5 递增");
+    if ((status !== "present" || nextLessons % 1 !== 0 || isMakeup) && !notes.trim()) {
+      return setError(status !== "present" ? "非到课状态必须填写原因" : "0.5 课时异常调整必须填写备注");
+    }
+    const quantityChanged = nextLessons !== Number(current.lesson_count ?? 1);
     setSubmitting(true);
     setError(null);
     try {
@@ -56,7 +63,8 @@ export function AttendanceEditModal({
         p_attendance_id: current.attendance_id,
         p_status: status as "present" | "absent" | "late" | "leave",
         p_notes: notes.trim() || null,
-        p_trigger_consume: Boolean(isMakeup && triggerConsume),
+        p_trigger_consume: Boolean((isMakeup && triggerConsume) || (quantityChanged && ["present", "late"].includes(status))),
+        p_lesson_count: nextLessons,
       });
       onSaved();
     } catch (caught) {
@@ -70,7 +78,7 @@ export function AttendanceEditModal({
     const lessonCount = Number(lessons);
     const enrollment = eligibleEnrollments.find((item) => item.enrollment_id === enrollmentId);
     if (!enrollment) return setError("请选择补录课程");
-    if (!Number.isInteger(lessonCount) || lessonCount <= 0) return setError("课时数必须是大于 0 的整数");
+    if (lessonCount <= 0 || !Number.isInteger(lessonCount * 2)) return setError("课时数必须大于 0 并按 0.5 递增");
     if (!reason.trim()) return setError("补录原因必填");
     setSubmitting(true);
     setError(null);
@@ -135,10 +143,15 @@ export function AttendanceEditModal({
                   ))}
                 </div>
               </div>
+              <div>
+                <div className="mb-1.5 text-xs text-slate-500">本次扣除课时</div>
+                <input type="number" min={0.5} step={0.5} value={lessonCount} onChange={(event) => setLessonCount(event.target.value)} className="h-9 w-40 rounded border border-slate-200 px-3 text-sm" />
+                {Number(lessonCount) % 1 !== 0 && <p className="mt-1 text-xs text-amber-600">0.5 课时属于异常调整，备注必填。</p>}
+              </div>
               {isMakeup && (
                 <label className="flex items-center gap-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-700">
                   <input type="checkbox" checked={triggerConsume} onChange={(event) => setTriggerConsume(event.target.checked)} />
-                  修改为到课/迟到时同时补扣 1 课时
+                  修改为到课/迟到时同时补扣所填课时
                 </label>
               )}
               {isReverse && (
@@ -159,7 +172,7 @@ export function AttendanceEditModal({
                 <div><label className="text-xs text-slate-500">课程</label><select value={enrollmentId} onChange={(event) => setEnrollmentId(event.target.value)} className="mt-1 h-10 w-full rounded border border-slate-200 px-3 text-sm">
                   {eligibleEnrollments.map((item) => <option key={item.enrollment_id} value={item.enrollment_id}>{item.course_name}（剩余 {item.remaining_lessons} 课时）</option>)}
                 </select></div>
-                <div><label className="text-xs text-slate-500">补录课时</label><input type="number" min={1} step={1} value={lessons} onChange={(event) => setLessons(event.target.value)} className="mt-1 h-10 w-full rounded border border-slate-200 px-3 text-sm" /></div>
+                <div><label className="text-xs text-slate-500">补录课时</label><input type="number" min={0.5} step={0.5} value={lessons} onChange={(event) => setLessons(event.target.value)} className="mt-1 h-10 w-full rounded border border-slate-200 px-3 text-sm" />{Number(lessons) % 1 !== 0 && <p className="mt-1 text-xs text-amber-600">0.5 课时属于异常调整，请在下方写明具体情况。</p>}</div>
                 <div><label className="text-xs text-slate-500">补录原因</label><textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="如：补录该日期实际已上课程" className="mt-1 min-h-20 w-full rounded border border-slate-200 px-3 py-2 text-sm" /></div>
                 <div className="rounded-lg bg-blue-50 p-3 text-xs text-blue-700">提交后进入手动课消审批，审批通过后才会扣减。</div>
               </>

@@ -1,40 +1,19 @@
-// AI 推荐充值话术 / 金额 — 输入 student_id → 输出充值建议
 import { NextResponse } from "next/server";
+import { createServerSupabase } from "@/lib/supabase/server";
 
-const CONTRACT = {
-  endpoint: "/api/ai/recommend-recharge",
-  methods: ["POST", "GET"],
-  query: { student_id: "UUID" },
-  upstream: {
-    signals_rpc: "rpc_get_student_signals",
-    note: "结合 finance.balance / burn_rate_30d / days_left_at_rate 给建议",
-  },
-  response: {
-    schema: {
-      suggested_amount: "number (¥)",
-      suggested_bonus: "number (¥, optional 赠送)",
-      pitch: "string (顾问可直接复用的话术, 80-150 字)",
-      reasoning: "string",
-      confidence: "0..1",
-    },
-  },
-};
+export async function GET(request: Request) { return handle(request); }
+export async function POST(request: Request) { return handle(request); }
 
-export async function GET(req: Request) {
-  return handle(req);
-}
-export async function POST(req: Request) {
-  return handle(req);
-}
-
-async function handle(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const studentId = searchParams.get("student_id");
-  if (!studentId) {
-    return NextResponse.json({ error: "INVALID_INPUT: student_id required", contract: CONTRACT }, { status: 400 });
-  }
-  return NextResponse.json(
-    { message: "AI 充值推荐尚未接通，合约文档如下：", contract: CONTRACT },
-    { status: 501 },
-  );
+async function handle(request: Request) {
+  const studentId = new URL(request.url).searchParams.get("student_id");
+  if (!studentId) return NextResponse.json({ error: "请选择需要分析的学员" }, { status: 400 });
+  const sb = createServerSupabase();
+  const { data, error } = await sb.rpc("rpc_get_student_ontology", { p_student_id: studentId });
+  if (error) return NextResponse.json({ error: `读取学员智能档案失败：${error.message}` }, { status: 400 });
+  return NextResponse.json({
+    configured: Boolean(process.env.DEEPSEEK_API_KEY),
+    model: process.env.DEEPSEEK_MODEL ?? "deepseek-v4-flash",
+    ontology: data,
+    message: "充值建议功能已预留；当前只整理授权范围内的分析输入，不会自动调用外部模型。",
+  }, { status: 501 });
 }

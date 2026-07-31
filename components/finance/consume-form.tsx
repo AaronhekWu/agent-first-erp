@@ -48,7 +48,7 @@ export function ConsumeForm() {
     if (!student) return setError("请选择学员");
     if (!enrollmentId) return setError("请选择课程");
     const n = Number(lessons);
-    if (!n || n <= 0) return setError("课时数必须大于 0");
+    if (!n || n <= 0 || !Number.isInteger(n * 2)) return setError("课时数必须大于 0 并按 0.5 递增");
     if (!consumeDate) return setError("请选择消课日期");
     if (!reason.trim()) return setError("请填写手动消课原因");
     setSubmitting(true);
@@ -112,12 +112,16 @@ export function ConsumeForm() {
         <Field label="扣课时数" required>
           <input
             type="number"
-            min={1}
+            min={0.5}
+            step={0.5}
             className={inputCls}
             value={lessons}
             onChange={(e) => setLessons(e.target.value)}
           />
         </Field>
+        {Number(lessons) % 1 !== 0 && (
+          <p className="mt-1 text-xs text-amber-600">0.5 课时属于异常调整，必须在右侧填写具体原因并进入审批。</p>
+        )}
       </div>
       <div className="grid grid-cols-2 gap-4">
         <Field label="消课日期" required>

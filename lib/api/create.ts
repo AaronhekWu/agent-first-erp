@@ -9,7 +9,7 @@ import { getSupabaseBrowser } from "@/lib/supabase/client";
 async function callRpc(rpcName: string, args: Record<string, unknown>): Promise<unknown> {
   const sb = getSupabaseBrowser();
   const { data, error } = await sb.rpc(rpcName, args);
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(error.message.replace(/^[A-Z][A-Z0-9_]*:\s*/, "").trim() || "操作失败，请稍后重试");
   return data;
 }
 
@@ -81,6 +81,7 @@ export interface CreateCourseInput {
   p_schedule_info?: Record<string, unknown> | null;
   p_department_id?: string | null;
   p_operator_id?: string | null;
+  p_homeroom_teacher_id?: string | null;
 }
 
 export function createCourse(input: CreateCourseInput) {
@@ -219,6 +220,7 @@ export interface MarkAttendanceInput {
   p_operator_id?: string | null;
   p_trigger_consume?: boolean;
   p_notes?: string | null;
+  p_lesson_count?: number;
 }
 export function markAttendance(input: MarkAttendanceInput) {
   return callRpc("rpc_mark_attendance", { ...input });
@@ -230,6 +232,7 @@ export interface UpdateAttendanceInput {
   p_notes?: string | null;
   p_trigger_consume?: boolean;
   p_operator_id?: string | null;
+  p_lesson_count?: number;
 }
 export function updateAttendance(input: UpdateAttendanceInput) {
   return callRpc("rpc_update_attendance", { ...input });
