@@ -130,8 +130,8 @@ export function CampusKpiDashboard({
 
   return (
     <div data-testid="campus-kpi-dashboard" className="min-w-0 space-y-5">
-      <div data-testid="campus-kpi-hero-grid" className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(21rem,0.55fr)]">
-        <section data-testid="campus-kpi-overview" className="min-w-0 overflow-hidden rounded-2xl bg-slate-900 p-5 text-white sm:p-6 xl:col-start-1 xl:row-start-1">
+      <div data-testid="campus-kpi-hero-grid" className="min-w-0 space-y-5">
+        <section data-testid="campus-kpi-overview" className="min-w-0 overflow-hidden rounded-2xl bg-slate-900 p-5 text-white sm:p-6">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <div className="flex items-center gap-2 text-xs font-medium text-sky-300">
@@ -160,13 +160,15 @@ export function CampusKpiDashboard({
           />
         </div>
         </section>
-        <AiAnalysisPanel
-          analysis={analysis}
-          error={analysisError}
-          analyzing={analyzing}
-          onAnalyze={runAnalysis}
-        />
-        <div className="grid gap-3 sm:grid-cols-2 xl:col-start-1 xl:row-start-2 xl:grid-cols-4">
+        <div className="mx-auto w-full max-w-5xl">
+          <AiAnalysisPanel
+            analysis={analysis}
+            error={analysisError}
+            analyzing={analyzing}
+            onAnalyze={runAnalysis}
+          />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <MetricVisual
               Icon={MessageSquareText}
               label="学员跟进"
@@ -253,16 +255,18 @@ function AiAnalysisPanel({ analysis, error, analyzing, onAnalyze }: {
   onAnalyze: () => void;
 }) {
   return (
-    <aside data-testid="campus-kpi-ai" className="min-w-0 overflow-hidden rounded-2xl border border-violet-200 bg-violet-50/70 xl:col-start-2 xl:row-span-2 xl:row-start-1">
-      <div className="bg-violet-600 p-5 text-white">
-        <div className="flex items-center gap-2 text-xs font-medium text-violet-100"><Bot className="h-4 w-4" />智能校区经营分析</div>
-        <h3 className="mt-2 text-lg font-semibold">把考核数据变成下一步行动</h3>
-        <p className="mt-1 text-xs leading-5 text-violet-100">由云端智能模型提炼亮点、风险与责任人建议。</p>
+    <aside data-testid="campus-kpi-ai" className="min-w-0 overflow-hidden rounded-2xl border border-violet-200 bg-violet-50/70 shadow-sm">
+      <div className="flex flex-col items-center gap-4 bg-violet-600 p-5 text-center text-white sm:flex-row sm:justify-between sm:text-left">
+        <div>
+          <div className="flex items-center justify-center gap-2 text-xs font-medium text-violet-100 sm:justify-start"><Bot className="h-4 w-4" />智能校区经营分析</div>
+          <h3 className="mt-2 text-lg font-semibold">把考核数据变成下一步行动</h3>
+          <p className="mt-1 text-xs leading-5 text-violet-100">由云端智能模型提炼亮点、风险与责任人建议。</p>
+        </div>
         <button
           type="button"
           onClick={onAnalyze}
           disabled={analyzing}
-          className="mt-4 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-white px-4 text-sm font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-70"
+          className="inline-flex h-9 w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-white px-4 text-sm font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-70 sm:w-auto"
         >
           <Sparkles className="h-4 w-4" />{analyzing ? "正在分析当前区间…" : analysis ? "重新生成分析" : "立即生成分析"}
         </button>
