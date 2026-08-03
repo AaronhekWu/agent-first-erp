@@ -7,7 +7,7 @@ import { hasServerPermission } from "@/lib/auth/access";
 import { redirect } from "next/navigation";
 import { getCampusKpis } from "@/lib/api/campus-kpis";
 import { CampusKpiDashboard } from "@/components/campus/campus-kpi-dashboard";
-import { localDate } from "@/lib/schedule";
+import { normalizeCampusKpiRange } from "@/lib/campus-kpi-range";
 
 export const dynamic = "force-dynamic";
 
@@ -18,13 +18,25 @@ interface PageProps {
 export default async function CampusPage({ searchParams }: PageProps) {
   const me = await getMe();
   if (!hasServerPermission(me, "campus.manage")) redirect("/dashboard");
-  const now = new Date();
-  const from = /^\d{4}-\d{2}-\d{2}$/.test(searchParams.from ?? "") ? searchParams.from! : localDate(new Date(now.getFullYear(), now.getMonth(), 1));
-  const to = /^\d{4}-\d{2}-\d{2}$/.test(searchParams.to ?? "") && searchParams.to! >= from ? searchParams.to! : localDate(now);
-  const [departments, staff, kpis] = await Promise.all([
+  const range = normalizeCampusKpiRange(searchParams.from, searchParams.to);
+  const [departments, staff, kpiResult] = await Promise.all([
     listDepartmentsDetail(),
     listStaff(),
-    getCampusKpis(from, to),
+    getCampusKpis(range.from, range.to)
+      .then((data) => ({ data, error: null as string | null }))
+      .catch((error: unknown) => {
+        console.error("Failed to load campus assessment data", error);
+        return {
+          data: {
+            period: { from: range.from, to: range.to },
+            staff: [],
+            courses: [],
+            daily: [],
+            source_updated_at: new Date().toISOString(),
+          },
+          error: "考核数据暂时无法加载，页面其他功能仍可正常使用，请稍后重试",
+        };
+      }),
   ]);
 
   return (
@@ -52,8 +64,13 @@ export default async function CampusPage({ searchParams }: PageProps) {
           },
           {
             key: "kpi",
-            label: "校区 KPI",
-            content: <CampusKpiDashboard data={kpis} aiModel="deepseek-v4-flash" />,
+            label: "校区考核",
+            content: (
+              <CampusKpiDashboard
+                data={kpiResult.data}
+                notice={[range.notice, kpiResult.error].filter(Boolean).join("；") || null}
+              />
+            ),
           },
         ]}
       />

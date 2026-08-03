@@ -1,4 +1,5 @@
 import { createServerSupabase } from "@/lib/supabase/server";
+import { validateCampusKpiRange } from "@/lib/campus-kpi-range";
 
 export interface CampusStaffKpi {
   staff_id: string;
@@ -44,6 +45,8 @@ export interface CampusKpis {
 }
 
 export async function getCampusKpis(from: string, to: string): Promise<CampusKpis> {
+  const rangeError = validateCampusKpiRange(from, to);
+  if (rangeError) throw new Error(rangeError);
   const sb = createServerSupabase();
   const { data, error } = await sb.rpc("rpc_get_campus_kpis", { p_from: from, p_to: to });
   if (error) throw error;

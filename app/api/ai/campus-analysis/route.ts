@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { invokeAiEdge } from "@/lib/ai/edge-proxy";
+import { validateCampusKpiRange } from "@/lib/campus-kpi-range";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,10 @@ export async function POST(request: Request) {
   }
   if (typeof body.from !== "string" || typeof body.to !== "string") {
     return NextResponse.json({ error: "请选择分析日期范围" }, { status: 400 });
+  }
+  const rangeError = validateCampusKpiRange(body.from, body.to);
+  if (rangeError) {
+    return NextResponse.json({ error: rangeError }, { status: 400 });
   }
   return invokeAiEdge({ action: "campus_analysis", from: body.from, to: body.to });
 }
