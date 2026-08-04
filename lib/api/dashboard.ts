@@ -1,5 +1,6 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import { countScheduledPersonTimes, localDate, type SchedulableCourse } from "@/lib/schedule";
+import { EMPTY_REGISTRATION_METRICS, type RegistrationMetrics } from "@/lib/api/campus-kpis";
 
 // 角色化仪表盘 —— 全部走 createServerSupabase (以登录用户身份, RLS/security_invoker 视图
 // 自动按角色/部门收敛), 无需新增 RPC。
@@ -58,6 +59,25 @@ export interface DashboardPeriod {
   label: string;
 }
 
+export interface FrozenCourseAction {
+  enrollment_id: string;
+  student_id: string;
+  student_name: string;
+  counselor_id: string | null;
+  counselor_name: string | null;
+  course_id: string;
+  course_name: string;
+  homeroom_teacher_id: string | null;
+  homeroom_teacher_name: string | null;
+  teacher_id: string | null;
+  teacher_name: string | null;
+  end_date: string | null;
+  course_status: string;
+  remaining_lessons: number;
+  frozen_at: string | null;
+  freeze_note: string | null;
+}
+
 export type DashboardData =
   | {
       role: "admin";
@@ -66,13 +86,15 @@ export type DashboardData =
       pendingApprovals: number;
       approvalQueue: ApprovalBrief[];
       daily: DailyFlow[];
-      graduated: number;
+      frozen: number;
       period: DashboardPeriod;
       courses: SchedulableCourse[];
       attendance: { expected: number; actual: number; ratio: number };
+      registrationMetrics: RegistrationMetrics;
+      frozenCourseActions: FrozenCourseAction[];
     }
-  | { role: "counselor"; myStudents: number; pendingFollowups: number; lowBalanceCount: number; lowBalance: LowBalance[] }
-  | { role: "teacher"; myClasses: number; classes: TeacherClass[] }
+  | { role: "counselor"; myStudents: number; pendingFollowups: number; lowBalanceCount: number; lowBalance: LowBalance[]; registrationMetrics: RegistrationMetrics; frozenCourseActions: FrozenCourseAction[] }
+  | { role: "teacher"; myClasses: number; classes: TeacherClass[]; registrationMetrics: RegistrationMetrics; frozenCourseActions: FrozenCourseAction[] }
   | { role: "generic" };
 
 export async function getDashboard(
@@ -94,7 +116,7 @@ export async function getDashboard(
   if (isAdmin || (!["teacher", "counselor"].includes(role ?? "") && permissions.length > 0)) {
     const since = new Date(`${period.from}T00:00:00`);
     const until = new Date(`${period.to}T23:59:59.999`);
-    const [summaryRes, apprRes, txRes, gradRes, courseRes, attendanceRes] = await Promise.all([
+    const [summaryRes, apprRes, txRes, frozenRes, courseRes, attendanceRes, registrationRes, frozenActionsRes] = await Promise.all([
       sb.rpc("rpc_get_dashboard_summary"),
       sb
         .from("aud_approvals")
@@ -112,7 +134,7 @@ export async function getDashboard(
       sb
         .from("stu_students")
         .select("id", { count: "exact", head: true })
-        .eq("status", "graduated")
+        .eq("status", "frozen")
         .is("deleted_at", null),
       sb
         .from("v_course_stats")
@@ -124,6 +146,8 @@ export async function getDashboard(
         .in("status", ["present", "late"])
         .gte("class_date", period.from)
         .lte("class_date", period.to),
+      sb.rpc("rpc_get_registration_metrics", { p_from: period.from, p_to: period.to }),
+      sb.rpc("rpc_list_frozen_course_actions"),
     ]);
 
     // 逐日充值/消课 (本地日期), 补齐无交易的空白天
@@ -171,15 +195,17 @@ export async function getDashboard(
       pendingApprovals: apprRes.count ?? 0,
       approvalQueue: (apprRes.data ?? []) as ApprovalBrief[],
       daily: [...byDay.values()],
-      graduated: gradRes.count ?? 0,
+      frozen: frozenRes.count ?? 0,
       period,
       courses,
       attendance: { expected, actual, ratio: expected > 0 ? Math.round(actual / expected * 1000) / 10 : 0 },
+      registrationMetrics: normalizeRegistrationMetrics(registrationRes.data, period),
+      frozenCourseActions: (frozenActionsRes.data ?? []) as FrozenCourseAction[],
     };
   }
 
   if (role === "counselor") {
-    const [stuRes, flwRes, balRes, balCntRes] = await Promise.all([
+    const [stuRes, flwRes, balRes, balCntRes, registrationRes, frozenActionsRes] = await Promise.all([
       sb.from("stu_students").select("id", { count: "exact", head: true }).is("deleted_at", null),
       sb.from("v_pending_followups").select("followup_id", { count: "exact", head: true }),
       sb
@@ -188,6 +214,8 @@ export async function getDashboard(
         .order("days_left", { ascending: true, nullsFirst: false })
         .limit(8),
       sb.from("v_balance_warnings").select("student_id", { count: "exact", head: true }),
+      sb.rpc("rpc_get_registration_metrics", { p_from: period.from, p_to: period.to }),
+      sb.rpc("rpc_list_frozen_course_actions"),
     ]);
     return {
       role: "counselor",
@@ -195,18 +223,24 @@ export async function getDashboard(
       pendingFollowups: flwRes.count ?? 0,
       lowBalanceCount: balCntRes.count ?? 0,
       lowBalance: (balRes.data ?? []) as LowBalance[],
+      registrationMetrics: normalizeRegistrationMetrics(registrationRes.data, period),
+      frozenCourseActions: (frozenActionsRes.data ?? []) as FrozenCourseAction[],
     };
   }
 
   if (role === "teacher") {
     const { data: userData } = await sb.auth.getUser();
     const myId = userData.user?.id ?? "";
-    const coursesRes = await sb
-      .from("crs_courses")
-      .select("id,name,teacher_id,homeroom_teacher_id,start_date,end_date,schedule_info")
-      .or(`teacher_id.eq.${myId},homeroom_teacher_id.eq.${myId}`)
-      .is("deleted_at", null)
-      .neq("status", "archived");
+    const [coursesRes, registrationRes, frozenActionsRes] = await Promise.all([
+      sb
+        .from("crs_courses")
+        .select("id,name,teacher_id,homeroom_teacher_id,start_date,end_date,schedule_info")
+        .or(`teacher_id.eq.${myId},homeroom_teacher_id.eq.${myId}`)
+        .is("deleted_at", null)
+        .neq("status", "archived"),
+      sb.rpc("rpc_get_registration_metrics", { p_from: period.from, p_to: period.to }),
+      sb.rpc("rpc_list_frozen_course_actions"),
+    ]);
     const courses = (coursesRes.data ?? []) as Array<{
       id: string; name: string; teacher_id: string | null; homeroom_teacher_id: string | null;
       start_date: string | null; end_date: string | null; schedule_info: { weekdays?: string[] } | null;
@@ -242,6 +276,8 @@ export async function getDashboard(
     return {
       role: "teacher",
       myClasses: courses.length,
+      registrationMetrics: normalizeRegistrationMetrics(registrationRes.data, period),
+      frozenCourseActions: (frozenActionsRes.data ?? []) as FrozenCourseAction[],
       classes: courses.map((c) => {
         const s = statsMap.get(c.id);
         return {
@@ -269,6 +305,18 @@ export async function getDashboard(
 function localDay(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function normalizeRegistrationMetrics(value: unknown, period: DashboardPeriod): RegistrationMetrics {
+  const data = (value ?? {}) as Partial<RegistrationMetrics>;
+  return {
+    ...EMPTY_REGISTRATION_METRICS,
+    ...data,
+    period: data.period ?? { from: period.from, to: period.to },
+    new_customer: data.new_customer ?? EMPTY_REGISTRATION_METRICS.new_customer,
+    expansion: data.expansion ?? EMPTY_REGISTRATION_METRICS.expansion,
+    renewal: data.renewal ?? EMPTY_REGISTRATION_METRICS.renewal,
+  };
 }
 
 function groupMonthlyFlows(rows: { type: string; amount: number; created_at: string }[]): DashSummary["monthly_revenue"] {

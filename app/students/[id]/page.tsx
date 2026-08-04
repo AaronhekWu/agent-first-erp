@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Wallet, BookOpen, Phone, Calendar, User, FileText, GraduationCap } from "lucide-react";
+import { ArrowLeft, Wallet, BookOpen, Phone, Calendar, User, FileText, GraduationCap, Snowflake } from "lucide-react";
 import { getStudentDetail } from "@/lib/api/student-detail";
 import { getStudentSignals } from "@/lib/api/signals";
 import { getLookups } from "@/lib/api/lookups";
@@ -113,6 +113,9 @@ export default async function StudentDetailPage({ params }: Props) {
             {s.status === "graduated" && (
               <InfoLine icon={GraduationCap} label="毕业日期" value={s.graduated_at ? formatDate(s.graduated_at) : "暂无"} />
             )}
+            {s.status === "frozen" && (
+              <InfoLine icon={Snowflake} label="冻结日期" value={s.frozen_at ? formatDate(s.frozen_at) : "暂无"} />
+            )}
           </div>
 
           {s.status === "graduated" && s.graduation_note && (
@@ -124,6 +127,11 @@ export default async function StudentDetailPage({ params }: Props) {
             <div className="mt-4 rounded-md bg-slate-50 p-3 text-sm text-slate-600">
               <span className="font-medium text-slate-700">备注：</span>
               {s.notes}
+            </div>
+          )}
+          {s.status === "frozen" && s.freeze_note && (
+            <div className="mt-4 rounded-md bg-cyan-50 p-3 text-sm text-cyan-700">
+              <span className="font-medium">冻结原因：</span>{s.freeze_note}
             </div>
           )}
 

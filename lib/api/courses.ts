@@ -46,6 +46,9 @@ export interface CourseEnrollment {
   student_name: string;
   student_code: string | null;
   student_phone: string | null;
+  student_status: "active" | "inactive" | "frozen" | "graduated";
+  student_frozen_at: string | null;
+  student_freeze_note: string | null;
   status: "enrolled" | "completed" | "transferred" | "cancelled";
   unit_price: number;
   list_unit_price: number | null;
@@ -73,6 +76,7 @@ export interface CourseEnrollment {
 export interface LessonLot {
   id: string;
   source_type: "paid" | "transfer" | "gift" | "adjustment";
+  registration_kind?: "new_customer" | "expansion" | "renewal" | null;
   unit_price: number;
   total_lessons: number;
   consumed_lessons: number;
@@ -121,6 +125,8 @@ export interface StudentSearchResult {
   balance?: number | null;
   frozen_amount?: number | null;
   available_balance?: number | null;
+  enrollment_count?: number | null;
+  predicted_registration_kind?: "new_customer" | "expansion" | "renewal";
 }
 
 // ---------- 服务端 ----------

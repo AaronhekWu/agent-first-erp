@@ -189,15 +189,48 @@ export async function listCourseSessions(courseId: string): Promise<CourseSessio
   return (data ?? []) as CourseSessionSummary[];
 }
 
-export async function searchStudents(keyword: string, limit = 10): Promise<StudentSearchResult[]> {
+export async function searchStudents(keyword: string, courseIdOrLimit?: string | number, requestedLimit = 10): Promise<StudentSearchResult[]> {
   const sb = getSupabaseBrowser();
+  const courseId = typeof courseIdOrLimit === "string" ? courseIdOrLimit : null;
+  const limit = typeof courseIdOrLimit === "number" ? courseIdOrLimit : requestedLimit;
   const kw = `%${keyword}%`;
   const { data, error } = await sb
     .from("v_student_overview")
-    .select("id, name, student_code, phone, status, balance, frozen_amount, available_balance")
+    .select("id, name, student_code, phone, status, balance, frozen_amount, available_balance, enrollment_count")
     .eq("status", "active")
     .or(`name.ilike.${kw},phone.ilike.${kw},student_code.ilike.${kw}`)
     .limit(limit);
   if (error) throw new Error(error.message);
-  return (data ?? []) as StudentSearchResult[];
+  const students = (data ?? []) as StudentSearchResult[];
+  if (students.length === 0) return students;
+
+  const history = await sb
+    .from("crs_lesson_lots")
+    .select("source_type, crs_enrollments!inner(student_id, course_id)")
+    .eq("source_type", "paid")
+    .in("crs_enrollments.student_id", students.map((student) => student.id));
+  const paidCourses = new Map<string, Set<string>>();
+  if (!history.error) {
+    for (const row of (history.data ?? []) as unknown as Array<{
+      crs_enrollments?: { student_id?: string; course_id?: string };
+    }>) {
+      const enrollment = row.crs_enrollments;
+      if (!enrollment?.student_id || !enrollment.course_id) continue;
+      const courses = paidCourses.get(enrollment.student_id) ?? new Set<string>();
+      courses.add(enrollment.course_id);
+      paidCourses.set(enrollment.student_id, courses);
+    }
+  }
+  return students.map((student) => {
+    const courses = paidCourses.get(student.id);
+    const fallbackHasHistory = Number(student.enrollment_count ?? 0) > 0;
+    const predicted_registration_kind = courseId && courses?.has(courseId)
+      ? "renewal"
+      : courses && courses.size > 0
+        ? "expansion"
+        : fallbackHasHistory
+          ? "expansion"
+          : "new_customer";
+    return { ...student, predicted_registration_kind };
+  });
 }

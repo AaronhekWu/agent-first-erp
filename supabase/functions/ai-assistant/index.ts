@@ -166,6 +166,7 @@ function compactKpis(raw: unknown): JsonObject {
   return {
     period: raw.period,
     source_updated_at: raw.source_updated_at,
+    registrations: raw.registrations,
     staff: Array.isArray(raw.staff) ? raw.staff.slice(0, 200) : [],
     courses: Array.isArray(raw.courses) ? raw.courses.slice(0, 300) : [],
     daily: Array.isArray(raw.daily) ? raw.daily.slice(0, 366) : [],

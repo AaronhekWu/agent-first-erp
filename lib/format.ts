@@ -67,9 +67,11 @@ export function studentStatusLabel(s: string | null | undefined): string {
       return "在读";
     case "inactive":
       return "已停用";
+    case "frozen":
+      return "已冻结";
     case "graduated":
       return "已毕业";
     default:
-      return s ?? "未知";
+      return "未知状态";
   }
 }

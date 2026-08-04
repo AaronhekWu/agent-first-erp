@@ -4,7 +4,7 @@ import { parseStudentSort, type StudentSort } from "@/lib/list-sorting";
 export type { Counselor, Department, Role, Lookups } from "./lookups";
 export { getLookups } from "./lookups";
 
-export type StudentStatus = "active" | "inactive" | "graduated";
+export type StudentStatus = "active" | "inactive" | "frozen" | "graduated";
 
 export interface StudentRow {
   id: string;

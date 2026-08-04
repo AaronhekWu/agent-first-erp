@@ -61,7 +61,7 @@ export function AttendanceTab({ enrollments, classDate, setClassDate, lessonLimi
   const allPresent = () => {
     const next = new Map<string, StatusKey>();
     for (const e of enrollments) {
-      if (e.today_attendance_id) continue; // 已点过名跳过
+      if (e.today_attendance_id || e.student_status === "frozen") continue; // 已点过名或冻结学员跳过
       next.set(e.enrollment_id, "present");
     }
     setPicks((cur) => {
@@ -73,7 +73,7 @@ export function AttendanceTab({ enrollments, classDate, setClassDate, lessonLimi
 
   const submit = async () => {
     for (const enrollment of enrollments) {
-      if (enrollment.today_attendance_id) continue;
+      if (enrollment.today_attendance_id || enrollment.student_status === "frozen") continue;
       const status = picks.get(enrollment.enrollment_id);
       if (!status) continue;
       const lessonCount = lessonCounts.get(enrollment.enrollment_id) ?? 1;
@@ -93,7 +93,7 @@ export function AttendanceTab({ enrollments, classDate, setClassDate, lessonLimi
     let failedMsg: string | null = null;
     let success = 0;
     for (const e of enrollments) {
-      if (e.today_attendance_id) continue; // skip already marked
+      if (e.today_attendance_id || e.student_status === "frozen") continue;
       const s = picks.get(e.enrollment_id);
       if (!s) continue;
       const lessonCount = lessonCounts.get(e.enrollment_id) ?? 1;
@@ -119,13 +119,19 @@ export function AttendanceTab({ enrollments, classDate, setClassDate, lessonLimi
     if (success > 0) await onMutate();
   };
 
-  const pendingCount = enrollments.filter((e) => !e.today_attendance_id).length;
+  const pendingCount = enrollments.filter((e) => !e.today_attendance_id && e.student_status !== "frozen").length;
+  const frozenCount = enrollments.filter((e) => e.student_status === "frozen").length;
 
   return (
     <div className="space-y-4">
       {lessonLimitReached && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           课程已达到计划总课次，不能新增上课日期。请前往“课程进度”调整计划或申请结课。
+        </div>
+      )}
+      {frozenCount > 0 && (
+        <div className="rounded-lg border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-800">
+          当前班级有 {frozenCount} 名冻结学员，已自动排除点名与课消；报名关系和剩余课时仍保留。
         </div>
       )}
       <div className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-50 p-4">
@@ -168,11 +174,15 @@ export function AttendanceTab({ enrollments, classDate, setClassDate, lessonLimi
             )}
             {enrollments.map((e) => {
               const isMarked = !!e.today_attendance_id;
+              const isFrozen = e.student_status === "frozen";
               const cur = picks.get(e.enrollment_id);
               return (
-                <tr key={e.enrollment_id} className={cn(isMarked && "bg-slate-50/60")}>
+                <tr key={e.enrollment_id} className={cn(isMarked && "bg-slate-50/60", isFrozen && "bg-cyan-50/50")}>
                   <td className="px-3 py-2">
-                    <div className="font-medium text-slate-800">{e.student_name}</div>
+                    <div className="flex items-center gap-2 font-medium text-slate-800">
+                      {e.student_name}
+                      {isFrozen && <span className="rounded bg-cyan-100 px-1.5 py-0.5 text-[11px] font-normal text-cyan-700">已冻结</span>}
+                    </div>
                     <div className="text-xs text-slate-400">{e.student_code ?? "无编号"}</div>
                   </td>
                   <td
@@ -189,7 +199,7 @@ export function AttendanceTab({ enrollments, classDate, setClassDate, lessonLimi
                   <td className="px-3 py-2 text-center">
                     <select
                       value={lessonCounts.get(e.enrollment_id) ?? 1}
-                      disabled={isMarked || lessonLimitReached}
+                      disabled={isMarked || isFrozen || lessonLimitReached}
                       onChange={(event) => setLessonCounts((current) => {
                         const next = new Map(current);
                         next.set(e.enrollment_id, Number(event.target.value));
@@ -208,12 +218,12 @@ export function AttendanceTab({ enrollments, classDate, setClassDate, lessonLimi
                           <button
                             key={o.key}
                             type="button"
-                            disabled={isMarked || lessonLimitReached}
+                            disabled={isMarked || isFrozen || lessonLimitReached}
                             onClick={() => setOne(e.enrollment_id, o.key)}
                             className={cn(
                               "inline-flex h-7 items-center gap-1 rounded border px-2 text-xs transition",
                               active ? o.activeCls : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50",
-                              isMarked && "opacity-60",
+                              (isMarked || isFrozen) && "opacity-60",
                             )}
                           >
                             <o.Icon className="h-3 w-3" />
@@ -224,8 +234,11 @@ export function AttendanceTab({ enrollments, classDate, setClassDate, lessonLimi
                       {isMarked && (
                         <span className="ml-1 self-center text-[11px] text-slate-400">已记录</span>
                       )}
+                      {isFrozen && (
+                        <span className="ml-1 self-center text-[11px] text-cyan-700">冻结期间不能点名或课消</span>
+                      )}
                     </div>
-                    {!isMarked && cur && (cur !== "present" || (lessonCounts.get(e.enrollment_id) ?? 1) % 1 !== 0) && (
+                    {!isMarked && !isFrozen && cur && (cur !== "present" || (lessonCounts.get(e.enrollment_id) ?? 1) % 1 !== 0) && (
                       <input
                         value={notes.get(e.enrollment_id) ?? ""}
                         onChange={(event) => setNotes((current) => {

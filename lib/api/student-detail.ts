@@ -51,6 +51,8 @@ export interface StudentDetail {
     school?: string | null;
     grade?: string | null;
     status: string;
+    frozen_at?: string | null;
+    freeze_note?: string | null;
     graduated_at?: string | null;
     graduation_note?: string | null;
     reactivated_at?: string | null;

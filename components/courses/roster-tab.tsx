@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { LogOut, ArrowRightLeft, ChevronDown, ChevronUp, Lock, ArrowUpDown, Plus, Save, Trash2 } from "lucide-react";
+import { LogOut, ArrowRightLeft, ChevronDown, ChevronUp, Lock, ArrowUpDown, Plus, Save, Trash2, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/format";
 import { requestApproval, getLockedTargets } from "@/lib/api/approvals-client";
@@ -39,6 +39,14 @@ export function RosterTab({ enrollments, course, onMutate, onOpenEnrollment }: P
   const [pricingDetailId, setPricingDetailId] = useState<string | null>(null);
   const [locked, setLocked] = useState<Set<string>>(new Set());
   const [sort, setSort] = useState<RosterSort>("default");
+  const courseEnded = course.status === "completed"
+    || course.status === "archived"
+    || Boolean(course.end_date && course.end_date < new Date().toISOString().slice(0, 10));
+  const frozenPending = enrollments.filter((enrollment) => (
+    enrollment.status === "enrolled"
+    && enrollment.student_status === "frozen"
+    && Number(enrollment.remaining_lessons ?? 0) !== 0
+  ));
 
   const sortedEnrollments = useMemo(() => [...enrollments].sort((a, b) => {
     const enrolledAt = (value: CourseEnrollment) => Date.parse(value.enrolled_at) || 0;
@@ -66,6 +74,17 @@ export function RosterTab({ enrollments, course, onMutate, onOpenEnrollment }: P
 
   return (
     <div>
+      {courseEnded && frozenPending.length > 0 && (
+        <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <div className="font-medium">班级已结束，仍有 {frozenPending.length} 名冻结学员待处理</div>
+            <div className="mt-1 text-xs leading-5 text-amber-700">
+              请课程顾问或班主任联系 {frozenPending.map((item) => item.student_name).join("、")}，并办理转课或退课；冻结期间不会点名或产生课消。
+            </div>
+          </div>
+        </div>
+      )}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
         <div>
           共 <span className="font-medium text-slate-800">{enrollments.length}</span> 条报名 ·
@@ -137,9 +156,14 @@ export function RosterTab({ enrollments, course, onMutate, onOpenEnrollment }: P
                   </td>
                   <td className="px-3 py-2 font-mono text-xs text-slate-500">{e.student_code ?? "无编号"}</td>
                   <td className="px-3 py-2">
-                    <span className={cn("inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs ring-1 ring-inset", st.cls)}>
-                      {st.label}
-                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      <span className={cn("inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs ring-1 ring-inset", st.cls)}>
+                        {st.label}
+                      </span>
+                      {e.student_status === "frozen" && (
+                        <span className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md bg-cyan-50 px-2 py-0.5 text-xs text-cyan-700 ring-1 ring-inset ring-cyan-200">已冻结</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums" title="实际收款 ÷ 总课时">
                     {formatCurrency(averageUnitPrice)}
@@ -213,7 +237,7 @@ export function RosterTab({ enrollments, course, onMutate, onOpenEnrollment }: P
                       <LessonLotManager
                         enrollment={e}
                         course={course}
-                        canEdit={e.status === "enrolled" && has("courses.pricing") && !locked.has(e.enrollment_id)}
+                        canEdit={e.status === "enrolled" && e.student_status !== "frozen" && has("courses.pricing") && !locked.has(e.enrollment_id)}
                         lockedTargets={locked}
                         onMutate={onMutate}
                         onOpenEnrollment={onOpenEnrollment}
@@ -376,7 +400,10 @@ function LessonLotManager({
             {enrollment.lesson_lots.map((lot) => (
               <Fragment key={lot.id}>
                 <tr className={editingId === lot.id ? "bg-brand-50/30" : undefined}>
-                  <td className="px-2 py-2">{lotTypeLabel(lot.source_type)}</td>
+                  <td className="px-2 py-2">
+                    <div>{lotTypeLabel(lot.source_type)}</div>
+                    {lot.registration_kind && <div className="mt-0.5 text-[10px] text-brand-600">{registrationKindLabel(lot.registration_kind)}</div>}
+                  </td>
                   <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(lot.unit_price)}</td>
                   <td className="px-2 py-2 text-center tabular-nums">{lot.consumed_lessons} / <span className="font-medium text-amber-600">{lot.remaining_lessons}</span> / {lot.total_lessons}</td>
                   <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(lot.total_amount)}</td>
@@ -545,6 +572,10 @@ function LessonLotDeleteModal({
 
 function lotTypeLabel(value: LessonLot["source_type"]) {
   return ({ paid: "正常付费", transfer: "转课带入", gift: "赠送课时", adjustment: "调整批次" } as const)[value];
+}
+
+function registrationKindLabel(value: NonNullable<LessonLot["registration_kind"]>) {
+  return ({ new_customer: "新客", expansion: "拓客", renewal: "续费" } as const)[value];
 }
 
 function PricingItem({ label, value, accent = false, strong = false }: { label: string; value: string; accent?: boolean; strong?: boolean }) {

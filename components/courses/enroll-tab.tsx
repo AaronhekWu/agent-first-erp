@@ -72,12 +72,12 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
     }
     let cancelled = false;
     const timer = setTimeout(() => {
-      void searchStudents(keyword.trim(), 12)
+      void searchStudents(keyword.trim(), course.course_id, 12)
         .then((rows) => !cancelled && setResults(rows))
         .catch((e) => !cancelled && setError((e as Error).message));
     }, 250);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [keyword]);
+  }, [course.course_id, keyword]);
 
   const availableCampaigns = campaigns;
   const selectedPlan = plans.find((plan) => plan.id === priceId);
@@ -152,9 +152,10 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
     setInfo(null);
     try {
       await enrollOne(student);
-      const additional = (existingByStudent.get(student.id) ?? []).some((item) => item.status === "enrolled");
+      const hasSameCourse = (existingByStudent.get(student.id) ?? []).some((item) => item.lesson_lots.some((lot) => lot.source_type === "paid"));
+      const attribution = registrationKindLabel(resolveRegistrationKind(student, hasSameCourse));
       setInfo(
-        `已为 ${student.name}${additional ? "追加" : ""}报名：锁定预付款 ${formatCurrency(quote.net)}，消课时逐节确认为收入`,
+        `已为 ${student.name}完成${attribution}报名：锁定预付款 ${formatCurrency(quote.net)}，消课时逐节确认为收入`,
       );
       setKeyword("");
       setResults([]);
@@ -294,6 +295,7 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
             const existing = existingByStudent.get(student.id) ?? [];
             const active = existing.find((item) => item.status === "enrolled");
             const selected = selectedStudents.has(student.id);
+            const registrationKind = resolveRegistrationKind(student, Boolean(active));
             const available = Number(student.available_balance ?? student.balance ?? 0);
             const insufficient = Number(student.balance ?? 0) < 0 || available < quote.net;
             return (
@@ -317,6 +319,9 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2 text-sm">
                     <span className="font-medium text-slate-800">{student.name}</span>
+                    <span className={`rounded px-1.5 py-0.5 text-[11px] ${registrationKindTone(registrationKind)}`}>
+                      {registrationKindLabel(registrationKind)}
+                    </span>
                     <span className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] text-slate-500">
                       {student.student_code ?? "无编号"}
                     </span>
@@ -354,7 +359,7 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
                   <UserPlus className="h-3.5 w-3.5" />
                   {busyId === student.id
                     ? "报名中…"
-                    : `${active ? "追加报名" : "报名"} ${formatCurrency(quote.net)}`}
+                    : `${registrationKindLabel(registrationKind)}报名 ${formatCurrency(quote.net)}`}
                 </button>
               </li>
             );
@@ -367,4 +372,20 @@ export function EnrollTab({ course, enrollments, onMutate }: Props) {
 
 function QuoteItem({ label, value, accent = false, strong = false }: { label: string; value: string; accent?: boolean; strong?: boolean }) {
   return <div><div className="text-xs text-slate-400">{label}</div><div className={`mt-1 text-sm ${accent ? "text-emerald-600" : strong ? "font-semibold text-slate-900" : "text-slate-700"}`}>{value}</div></div>;
+}
+
+function resolveRegistrationKind(student: StudentSearchResult, hasSameCourse = false) {
+  return hasSameCourse ? "renewal" : student.predicted_registration_kind ?? "new_customer";
+}
+
+function registrationKindLabel(value: NonNullable<StudentSearchResult["predicted_registration_kind"]>) {
+  return ({ new_customer: "新客", expansion: "拓客", renewal: "续费" } as const)[value];
+}
+
+function registrationKindTone(value: NonNullable<StudentSearchResult["predicted_registration_kind"]>) {
+  return ({
+    new_customer: "bg-emerald-50 text-emerald-700",
+    expansion: "bg-violet-50 text-violet-700",
+    renewal: "bg-blue-50 text-blue-700",
+  } as const)[value];
 }

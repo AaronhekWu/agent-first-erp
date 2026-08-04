@@ -14,7 +14,10 @@ import {
   RefreshCcw,
   Sparkles,
   UserCheck,
+  UserPlus,
   Users,
+  Network,
+  Repeat2,
 } from "lucide-react";
 import type { CampusCourseKpi, CampusKpis, CampusStaffKpi } from "@/lib/api/campus-kpis";
 import { validateCampusKpiRange } from "@/lib/campus-kpi-range";
@@ -160,14 +163,6 @@ export function CampusKpiDashboard({
           />
         </div>
         </section>
-        <div className="mx-auto w-full max-w-5xl">
-          <AiAnalysisPanel
-            analysis={analysis}
-            error={analysisError}
-            analyzing={analyzing}
-            onAnalyze={runAnalysis}
-          />
-        </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <MetricVisual
               Icon={MessageSquareText}
@@ -240,11 +235,66 @@ export function CampusKpiDashboard({
 
       <ActivityTrend data={data} />
 
+      <div className="mx-auto w-full max-w-5xl">
+        <AiAnalysisPanel
+          analysis={analysis}
+          error={analysisError}
+          analyzing={analyzing}
+          onAnalyze={runAnalysis}
+        />
+      </div>
+
+      <RegistrationPerformance data={data} />
+
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
         <StaffPerformance rows={staff} />
         <CourseHealth rows={courses} />
       </div>
     </div>
+  );
+}
+
+function RegistrationPerformance({ data }: { data: CampusKpis }) {
+  const metrics = data.registrations;
+  const cards = [
+    { label: "新客", description: "首次付费报课", metric: metrics.new_customer, Icon: UserPlus, tone: "emerald" as Tone },
+    { label: "拓客", description: "老生新增其他课程", metric: metrics.expansion, Icon: Network, tone: "violet" as Tone },
+    { label: "续费", description: "同一课程再次付费", metric: metrics.renewal, Icon: Repeat2, tone: "blue" as Tone },
+  ];
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <Header title="报名转化结构" sub="按付费报名批次自动归因；占比以本期付费报名总笔数为分母，赠送与转课不计入。" />
+        <div className="rounded-lg bg-slate-50 px-3 py-2 text-right">
+          <div className="text-[11px] text-slate-400">本期报名总额 / 总笔数</div>
+          <div className="mt-0.5 text-sm font-semibold text-slate-800">{formatCurrency(metrics.total_amount)} · {metrics.total_count} 笔</div>
+        </div>
+      </div>
+      <div className="mt-4 grid gap-3 lg:grid-cols-3">
+        {cards.map(({ label, description, metric, Icon, tone }) => (
+          <div key={label} className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
+            <div className="flex items-center gap-3">
+              <span className={`grid h-10 w-10 place-items-center rounded-full ${TONES[tone].icon}`}><Icon className="h-5 w-5" /></span>
+              <div>
+                <div className="text-sm font-semibold text-slate-800">{label}</div>
+                <div className="text-[11px] text-slate-400">{description}</div>
+              </div>
+              <div className={`ml-auto text-2xl font-semibold tabular-nums ${TONES[tone].text}`}>{metric.count}</div>
+            </div>
+            <div className="mt-4">
+              <div className="mb-1.5 flex items-center justify-between text-xs text-slate-500"><span>{label}率</span><span>{formatNumber(metric.rate)}%</span></div>
+              <div className="h-2 overflow-hidden rounded-full bg-white">
+                <div className={`h-full rounded-full ${TONES[tone].bar}`} style={{ width: `${Math.max(0, Math.min(Number(metric.rate), 100))}%` }} />
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3 text-xs">
+              <span className="text-slate-400">报名总额</span>
+              <span className="font-semibold text-slate-700">{formatCurrency(metric.amount)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

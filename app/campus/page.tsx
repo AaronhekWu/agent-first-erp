@@ -5,7 +5,7 @@ import { StaffTable } from "@/components/campus/staff-table";
 import { getMe } from "@/lib/auth/me";
 import { hasServerPermission } from "@/lib/auth/access";
 import { redirect } from "next/navigation";
-import { getCampusKpis } from "@/lib/api/campus-kpis";
+import { EMPTY_REGISTRATION_METRICS, getCampusKpis } from "@/lib/api/campus-kpis";
 import { CampusKpiDashboard } from "@/components/campus/campus-kpi-dashboard";
 import { normalizeCampusKpiRange } from "@/lib/campus-kpi-range";
 
@@ -32,6 +32,7 @@ export default async function CampusPage({ searchParams }: PageProps) {
             staff: [],
             courses: [],
             daily: [],
+            registrations: { ...EMPTY_REGISTRATION_METRICS, period: { from: range.from, to: range.to } },
             source_updated_at: new Date().toISOString(),
           },
           error: "考核数据暂时无法加载，页面其他功能仍可正常使用，请稍后重试",

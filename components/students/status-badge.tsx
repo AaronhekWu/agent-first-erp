@@ -13,10 +13,14 @@ const MAP: Record<string, { label: string; cls: string }> = {
     label: "已毕业",
     cls: "bg-blue-50 text-blue-700 ring-blue-200",
   },
+  frozen: {
+    label: "已冻结",
+    cls: "bg-cyan-50 text-cyan-700 ring-cyan-200",
+  },
 };
 
 export function StatusBadge({ status }: { status: string }) {
-  const it = MAP[status] ?? { label: status, cls: "bg-slate-100 text-slate-600 ring-slate-200" };
+  const it = MAP[status] ?? { label: "未知状态", cls: "bg-slate-100 text-slate-600 ring-slate-200" };
   return (
     <span
       className={cn(

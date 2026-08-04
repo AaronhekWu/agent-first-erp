@@ -17,7 +17,7 @@ import {
   UserCog,
   Trash2,
   Wallet,
-  GraduationCap,
+  Snowflake,
   RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -26,13 +26,14 @@ import {
   formatDate,
   followupTypeLabel,
   displayPhone,
+  studentStatusLabel,
 } from "@/lib/format";
 import { StatusBadge } from "./status-badge";
 import { StudentDrawer } from "./student-drawer";
 import { Gate } from "@/lib/auth/permissions-context";
 import { requestApproval } from "@/lib/api/approvals-client";
 import { batchDeleteStudents } from "@/lib/api/students-edge-client";
-import { batchAssignStudents, graduateStudent, reactivateStudent } from "@/lib/api/create";
+import { batchAssignStudents, freezeStudent, reactivateStudent } from "@/lib/api/create";
 import type { Counselor, StudentRow } from "@/lib/api/students";
 import { parseStudentSort, STUDENT_SORT_OPTIONS } from "@/lib/list-sorting";
 import { UrlSortSelect } from "@/components/ui/url-sort-select";
@@ -66,7 +67,7 @@ function displayColumnValue(row: StudentRow, key: string): string {
   switch (key) {
     case "name": return row.name;
     case "phone": return displayPhone(row.phone);
-    case "status": return row.status === "graduated" ? "已毕业" : "在读";
+    case "status": return studentStatusLabel(row.status);
     case "school": return row.school ?? "未填写";
     case "grade": return row.grade ?? "未填写";
     case "department_name": return row.department_name ?? "未分配";
@@ -92,7 +93,7 @@ export function StudentTable({ rows, counselors, total, page, pageSize, sort: ra
   const sp = useSearchParams();
   const [active, setActive] = useState<StudentRow | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [graduationTarget, setGraduationTarget] = useState<StudentRow | null>(null);
+  const [freezeTarget, setFreezeTarget] = useState<StudentRow | null>(null);
   const [reactivationTarget, setReactivationTarget] = useState<StudentRow | null>(null);
   const [batchCounselorId, setBatchCounselorId] = useState("");
   const [batchTransferring, setBatchTransferring] = useState(false);
@@ -374,7 +375,7 @@ export function StudentTable({ rows, counselors, total, page, pageSize, sort: ra
             {rows.map((r) => {
               const isChecked = selected.has(r.id);
               const isActive = r.status === "active";
-              const isGraduated = r.status === "graduated";
+              const canReactivate = r.status === "frozen" || r.status === "graduated";
               return (
               <tr
                 key={r.id}
@@ -454,8 +455,8 @@ export function StudentTable({ rows, counselors, total, page, pageSize, sort: ra
                           </Link>
                         </Gate>
                         <Gate keys="students.graduate">
-                          <button type="button" onClick={() => setGraduationTarget(r)} title="毕业" className="grid h-8 w-8 place-items-center rounded-md text-blue-600 hover:bg-blue-50">
-                            <GraduationCap className="h-4 w-4" />
+                          <button type="button" onClick={() => setFreezeTarget(r)} title="冻结" className="grid h-8 w-8 place-items-center rounded-md text-cyan-600 hover:bg-cyan-50">
+                            <Snowflake className="h-4 w-4" />
                           </button>
                         </Gate>
                         <Gate keys="students.delete">
@@ -465,7 +466,7 @@ export function StudentTable({ rows, counselors, total, page, pageSize, sort: ra
                         </Gate>
                       </>
                     )}
-                    {isGraduated && (
+                    {canReactivate && (
                       <Gate keys="students.graduate">
                         <button type="button" onClick={() => setReactivationTarget(r)} title="恢复在读" className="grid h-8 w-8 place-items-center rounded-md text-emerald-600 hover:bg-emerald-50">
                           <RotateCcw className="h-4 w-4" />
@@ -499,13 +500,13 @@ export function StudentTable({ rows, counselors, total, page, pageSize, sort: ra
       </div>
 
       <StudentDrawer student={active} onClose={() => setActive(null)} />
-      {graduationTarget && (
+      {freezeTarget && (
         <StudentStatusModal
-          student={graduationTarget}
-          mode="graduate"
-          onClose={() => setGraduationTarget(null)}
+          student={freezeTarget}
+          mode="freeze"
+          onClose={() => setFreezeTarget(null)}
           onDone={() => {
-            setGraduationTarget(null);
+            setFreezeTarget(null);
             router.refresh();
           }}
         />
@@ -532,7 +533,7 @@ function StudentStatusModal({
   onDone,
 }: {
   student: StudentRow;
-  mode: "graduate" | "reactivate";
+  mode: "freeze" | "reactivate";
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -540,16 +541,16 @@ function StudentStatusModal({
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const graduating = mode === "graduate";
+  const freezing = mode === "freeze";
 
   const submit = async () => {
-    if (graduating && !date) return setError("请选择毕业日期");
-    if (!graduating && !reason.trim()) return setError("请填写恢复在读原因");
+    if (freezing && !date) return setError("请选择冻结日期");
+    if (!reason.trim()) return setError(freezing ? "请填写冻结原因" : "请填写恢复在读原因");
     setSubmitting(true);
     setError(null);
     try {
-      if (graduating) {
-        await graduateStudent({ p_student_id: student.id, p_graduated_at: date, p_note: reason.trim() || null });
+      if (freezing) {
+        await freezeStudent({ p_student_id: student.id, p_frozen_at: date, p_note: reason.trim() });
       } else {
         await reactivateStudent({ p_student_id: student.id, p_reason: reason.trim() });
       }
@@ -565,34 +566,34 @@ function StudentStatusModal({
     <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-900/40 p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
         <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4">
-          {graduating ? <GraduationCap className="h-5 w-5 text-blue-600" /> : <RotateCcw className="h-5 w-5 text-emerald-600" />}
-          <h3 className="font-semibold text-slate-900">{graduating ? "办理毕业" : "恢复在读"}</h3>
+          {freezing ? <Snowflake className="h-5 w-5 text-cyan-600" /> : <RotateCcw className="h-5 w-5 text-emerald-600" />}
+          <h3 className="font-semibold text-slate-900">{freezing ? "冻结学员" : "恢复在读"}</h3>
         </div>
         <div className="space-y-4 px-5 py-4 text-sm">
           <p className="text-slate-600">
             学员：<span className="font-medium text-slate-900">{student.name}</span>
           </p>
-          {graduating && (
-            <div className="rounded-md bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-700">
-              系统将确认该学员没有在读课程、账户余额及冻结金额均为零，并且没有待处理审批。毕业后保留全部历史记录。
+          {freezing && (
+            <div className="rounded-md bg-cyan-50 px-3 py-2 text-xs leading-5 text-cyan-700">
+              冻结后仍保留在原班级和全部历史记录，但不能新增报名、点名或产生课消。班级结束后，系统会提醒顾问与班主任联系并办理转课或退课。
             </div>
           )}
-          {graduating && (
+          {freezing && (
             <label className="block text-xs font-medium text-slate-600">
-              毕业日期
+              冻结日期
               <input type="date" value={date} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setDate(e.target.value)} className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm focus:border-brand-500 focus:outline-none" />
             </label>
           )}
           <label className="block text-xs font-medium text-slate-600">
-            {graduating ? "毕业备注（可选）" : "恢复原因"}
-            <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder={graduating ? "例如：完成全部课程，正常毕业" : "必填，例如：学员重新报名学习"} className="mt-1 min-h-20 w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+            {freezing ? "冻结原因" : "恢复原因"}
+            <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder={freezing ? "必填，例如：暂停学习，等待后续安排" : "必填，例如：学员恢复正常学习"} className="mt-1 min-h-20 w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
           </label>
           {error && <div className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">{error}</div>}
         </div>
         <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-3">
           <button type="button" onClick={onClose} disabled={submitting} className="h-9 rounded-md border border-slate-200 bg-white px-4 text-sm text-slate-700">取消</button>
-          <button type="button" onClick={submit} disabled={submitting} className={cn("h-9 rounded-md px-4 text-sm font-medium text-white disabled:opacity-50", graduating ? "bg-blue-600 hover:bg-blue-700" : "bg-emerald-600 hover:bg-emerald-700")}>
-            {submitting ? "处理中…" : graduating ? "确认毕业" : "确认恢复"}
+          <button type="button" onClick={submit} disabled={submitting || !reason.trim()} className={cn("h-9 rounded-md px-4 text-sm font-medium text-white disabled:opacity-50", freezing ? "bg-cyan-600 hover:bg-cyan-700" : "bg-emerald-600 hover:bg-emerald-700")}>
+            {submitting ? "处理中…" : freezing ? "确认冻结" : "确认恢复"}
           </button>
         </div>
       </div>

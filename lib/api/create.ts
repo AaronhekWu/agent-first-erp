@@ -60,6 +60,10 @@ export function graduateStudent(input: { p_student_id: string; p_graduated_at: s
   return callRpc("rpc_graduate_student", { ...input });
 }
 
+export function freezeStudent(input: { p_student_id: string; p_frozen_at: string; p_note: string }) {
+  return callRpc("rpc_freeze_student", { ...input });
+}
+
 export function reactivateStudent(input: { p_student_id: string; p_reason: string }) {
   return callRpc("rpc_reactivate_student", { ...input });
 }

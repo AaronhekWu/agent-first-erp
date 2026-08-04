@@ -8,6 +8,10 @@ import {
   AlertTriangle,
   GraduationCap,
   TrendingUp,
+  UserPlus,
+  Network,
+  Repeat2,
+  Snowflake,
 } from "lucide-react";
 import { getMe } from "@/lib/auth/me";
 import { getDashboard, resolveDashboardPeriod } from "@/lib/api/dashboard";
@@ -17,6 +21,8 @@ import { PERMISSION_CATALOG, ROLE_DEFAULTS, ROLE_LABELS } from "@/lib/permission
 import { PeriodControl } from "@/components/dashboard/period-control";
 import { DailyScheduleTimeline } from "@/components/courses/daily-schedule-timeline";
 import { localDate } from "@/lib/schedule";
+import type { FrozenCourseAction } from "@/lib/api/dashboard";
+import type { RegistrationMetrics } from "@/lib/api/campus-kpis";
 
 export const dynamic = "force-dynamic";
 
@@ -118,6 +124,8 @@ function AdminView({ data }: { data: Extract<Awaited<ReturnType<typeof getDashbo
         {data.access.finance && <Tile icon={Wallet} label={`${data.period.label}净收入`} value={formatCurrency(s?.finance.net_revenue ?? 0)} tone="slate" />}
         {data.access.audits && <Tile icon={CheckSquare} label="待审批" value={data.pendingApprovals} sub="点击进入审批中心" tone={data.pendingApprovals > 0 ? "amber" : "slate"} href="/audits" />}
       </div>
+      <RegistrationCountCards metrics={data.registrationMetrics} periodLabel={data.period.label} />
+      <FrozenCourseReminder actions={data.frozenCourseActions} />
       <div className="grid gap-3 sm:grid-cols-3">
         {data.access.students && <Tile icon={Users} label="学员总数" value={s?.students.total ?? 0} sub={`在读 ${s?.students.active ?? 0}`} href="/students" />}
         {data.access.courses && <Tile icon={BookOpen} label="在读班级" value={s?.courses.active ?? 0} sub={`在读报名 ${s?.courses.active_enrollments ?? 0}`} href="/courses" />}
@@ -142,7 +150,7 @@ function AdminView({ data }: { data: Extract<Awaited<ReturnType<typeof getDashbo
         {data.access.students && <Panel title="学员状态分布">
           <StatusDonut
             active={s?.students.active ?? 0}
-            graduated={data.graduated}
+            frozen={data.frozen}
             total={s?.students.total ?? 0}
           />
         </Panel>}
@@ -262,11 +270,11 @@ function TrendChart({ daily }: { daily: { day: string; recharge: number; consume
   );
 }
 
-function StatusDonut({ active, graduated, total }: { active: number; graduated: number; total: number }) {
-  const other = Math.max(0, total - active - graduated);
+function StatusDonut({ active, frozen, total }: { active: number; frozen: number; total: number }) {
+  const other = Math.max(0, total - active - frozen);
   const parts = [
     { label: "在读", value: active, color: "#10b981" },
-    { label: "已毕业", value: graduated, color: "#60a5fa" },
+    { label: "已冻结", value: frozen, color: "#06b6d4" },
     { label: "其他", value: other, color: "#cbd5e1" },
   ].filter((p) => p.value > 0);
   const sum = parts.reduce((s, p) => s + p.value, 0);
@@ -321,6 +329,8 @@ function CounselorView({ data }: { data: Extract<Awaited<ReturnType<typeof getDa
         <Tile icon={Clock} label="待跟进" value={data.pendingFollowups} sub="按计划时间排序" tone={data.pendingFollowups > 0 ? "amber" : "slate"} href="/followups" />
         <Tile icon={AlertTriangle} label="余额不足提醒" value={data.lowBalanceCount} tone={data.lowBalanceCount > 0 ? "red" : "slate"} />
       </div>
+      <RegistrationCountCards metrics={data.registrationMetrics} periodLabel="当前统计时段" />
+      <FrozenCourseReminder actions={data.frozenCourseActions} />
       <Panel title="余额不足学员（优先联系）">
         <div className="divide-y divide-slate-100">
           {data.lowBalance.length === 0 && <div className="px-5 py-10 text-center text-sm text-slate-400">暂无余额预警</div>}
@@ -349,6 +359,8 @@ function TeacherView({ data }: { data: Extract<Awaited<ReturnType<typeof getDash
         <Tile icon={GraduationCap} label="在读学员" value={data.classes.reduce((n, c) => n + c.active_enrolled, 0)} />
         <Tile icon={Clock} label="今日待点名班级" value={pendingClasses} tone={pendingClasses > 0 ? "amber" : "slate"} />
       </div>
+      <RegistrationCountCards metrics={data.registrationMetrics} periodLabel="当前统计时段" />
+      <FrozenCourseReminder actions={data.frozenCourseActions} />
       <Panel title="我的班级">
         <div className="divide-y divide-slate-100">
           {data.classes.length === 0 && <div className="px-5 py-10 text-center text-sm text-slate-400">你还没有带班</div>}
@@ -372,5 +384,62 @@ function TeacherView({ data }: { data: Extract<Awaited<ReturnType<typeof getDash
         </div>
       </Panel>
     </div>
+  );
+}
+
+function RegistrationCountCards({ metrics, periodLabel }: { metrics: RegistrationMetrics; periodLabel: string }) {
+  const items = [
+    { label: "新客", metric: metrics.new_customer, Icon: UserPlus, tone: "border-emerald-200 bg-emerald-50 text-emerald-700" },
+    { label: "拓客", metric: metrics.expansion, Icon: Network, tone: "border-violet-200 bg-violet-50 text-violet-700" },
+    { label: "续费", metric: metrics.renewal, Icon: Repeat2, tone: "border-blue-200 bg-blue-50 text-blue-700" },
+  ];
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-medium text-slate-700">报名结构</h2>
+          <p className="mt-0.5 text-xs text-slate-400">{periodLabel} · 按付费报名批次自动归因，赠送与转课不计入</p>
+        </div>
+        <span className="text-xs text-slate-400">共 {metrics.total_count} 笔</span>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {items.map(({ label, metric, Icon, tone }) => (
+          <div key={label} className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${tone}`}>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/80"><Icon className="h-5 w-5" /></span>
+            <div>
+              <div className="text-xs opacity-80">{label}数量</div>
+              <div className="mt-0.5 text-2xl font-semibold tabular-nums">{metric.count}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FrozenCourseReminder({ actions }: { actions: FrozenCourseAction[] }) {
+  if (actions.length === 0) return null;
+  return (
+    <Panel title={`班级结束后的冻结学员待办（${actions.length}）`}>
+      <div className="divide-y divide-amber-100 bg-amber-50/50">
+        {actions.slice(0, 8).map((action) => (
+          <div key={action.enrollment_id} className="flex flex-col gap-2 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-cyan-100 text-cyan-700"><Snowflake className="h-4 w-4" /></span>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-medium text-slate-800">{action.student_name} · {action.course_name}</div>
+                <div className="mt-0.5 text-xs text-slate-500">
+                  剩余 {action.remaining_lessons} 课时 · 顾问 {action.counselor_name ?? "未分配"} · 班主任 {action.homeroom_teacher_name ?? "未分配"}
+                </div>
+              </div>
+            </div>
+            <div className="flex shrink-0 gap-2 text-xs">
+              <Link href={`/students/${action.student_id}`} className="rounded border border-slate-200 bg-white px-2.5 py-1.5 text-slate-600 hover:bg-slate-50">学员详情</Link>
+              <Link href={`/courses?course=${action.course_id}&tab=roster`} className="rounded bg-amber-600 px-2.5 py-1.5 font-medium text-white hover:bg-amber-700">办理转课 / 退课</Link>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Panel>
   );
 }
