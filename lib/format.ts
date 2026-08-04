@@ -37,12 +37,21 @@ export function formatDate(
   if (!iso) return "暂无";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "暂无";
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
+  // 服务端和浏览器统一使用校区所在的东八区，避免 SSR 水合时因运行环境时区不同而产生文本跳动。
+  const parts = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    ...(withTime ? { hour: "2-digit", minute: "2-digit", hourCycle: "h23" as const } : {}),
+  }).formatToParts(d);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
+  const yyyy = part("year");
+  const mm = part("month");
+  const dd = part("day");
   if (!withTime) return `${yyyy}-${mm}-${dd}`;
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mi = String(d.getMinutes()).padStart(2, "0");
+  const hh = part("hour");
+  const mi = part("minute");
   return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
 }
 
