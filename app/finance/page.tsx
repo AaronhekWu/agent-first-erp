@@ -27,7 +27,7 @@ export default async function FinancePage({ searchParams }: PageProps) {
     : "recharge";
   const [kpis, txs, consumptionTxs, rechargeStudent] = await Promise.all([
     getFinanceKpis(),
-    listTransactions({ limit: 500 }),
+    listTransactions({ excludeTypes: ["consume"], limit: 500 }),
     listTransactions({ type: "consume", limit: 1000 }),
     getRechargeStudent(searchParams.student),
   ]);
@@ -56,7 +56,11 @@ export default async function FinancePage({ searchParams }: PageProps) {
           { key: "recharge", label: "充值", content: <RechargeForm initialStudent={rechargeStudent} /> },
           { key: "refund", label: "退费", content: <RefundForm /> },
           { key: "consume", label: "手动消课", content: <ConsumeForm /> },
-          { key: "transactions", label: "全部流水", content: <TransactionList rows={txs} /> },
+          {
+            key: "transactions",
+            label: "全部流水",
+            content: <TransactionList rows={txs} excludedTypes={["consume"]} />,
+          },
           {
             key: "consumptions",
             label: "全部课消",

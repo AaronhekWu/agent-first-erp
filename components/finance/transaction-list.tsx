@@ -32,10 +32,12 @@ const TYPE_LABEL: Record<string, { label: string; cls: string }> = {
 export function TransactionList({
   rows,
   fixedType,
+  excludedTypes = [],
   exportTitle = "财务流水",
 }: {
   rows: Transaction[];
   fixedType?: TxType;
+  excludedTypes?: TxType[];
   exportTitle?: string;
 }) {
   const [type, setType] = useState<TxType | "">(fixedType ?? "");
@@ -47,10 +49,12 @@ export function TransactionList({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const excludedTypeSet = useMemo(() => new Set(excludedTypes), [excludedTypes]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return rows.filter((t) => {
+      if (excludedTypeSet.has(t.type)) return false;
       const selectedType = fixedType ?? type;
       if (selectedType && t.type !== selectedType) return false;
       if (from && t.created_at.slice(0, 10) < from) return false;
@@ -64,7 +68,7 @@ export function TransactionList({
         (t.description ?? "").toLowerCase().includes(q)
       );
     });
-  }, [rows, fixedType, type, query, from, to, min, max]);
+  }, [rows, excludedTypeSet, fixedType, type, query, from, to, min, max]);
 
   const summary = useMemo(() => {
     return filtered.reduce(
@@ -191,7 +195,7 @@ export function TransactionList({
               className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm focus:border-brand-500 focus:outline-none"
             >
               <option value="">全部类型</option>
-              {Object.entries(TYPE_LABEL).map(([key, item]) => (
+              {Object.entries(TYPE_LABEL).filter(([key]) => !excludedTypeSet.has(key as TxType)).map(([key, item]) => (
                 <option key={key} value={key}>
                   {item.label}
                 </option>
@@ -209,20 +213,26 @@ export function TransactionList({
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-5">
-        <SummaryCard label="筛选充值" value={summary.recharge} tone="emerald" />
-        <SummaryCard label="筛选退费" value={summary.refund} tone="amber" />
-        <SummaryCard label="筛选消费" value={summary.consume} tone="red" />
-        <SummaryCard label="筛选净锁定预付款" value={summary.prepayment} tone="blue" />
-        <SummaryCard label="筛选现金净额" value={summary.net} tone="slate" />
-      </div>
+      {fixedType === "consume" ? (
+        <div className="grid gap-3 md:grid-cols-1">
+          <SummaryCard label="筛选课消金额" value={summary.consume} tone="red" />
+        </div>
+      ) : (
+        <div className={cn("grid gap-3", excludedTypeSet.has("consume") ? "md:grid-cols-4" : "md:grid-cols-5")}>
+          <SummaryCard label="筛选充值" value={summary.recharge} tone="emerald" />
+          <SummaryCard label="筛选退费" value={summary.refund} tone="amber" />
+          {!excludedTypeSet.has("consume") && <SummaryCard label="筛选消费" value={summary.consume} tone="red" />}
+          <SummaryCard label="筛选净锁定预付款" value={summary.prepayment} tone="blue" />
+          <SummaryCard label="筛选现金净额" value={summary.net} tone="slate" />
+        </div>
+      )}
 
       <div className="rounded-lg border border-slate-200 bg-white">
         <div className="border-b border-slate-100 px-4 py-3 text-sm text-slate-500">
           <span>
             当前筛选 <span className="font-medium text-slate-900">{filtered.length}</span> 条
           </span>
-          <span>数据源：最近 {rows.length} 条流水</span>
+          <span>数据源：最近 {rows.length} 条{fixedType === "consume" ? "课消记录" : "流水"}</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1260px] table-fixed text-sm">

@@ -122,6 +122,7 @@ export async function getFinanceKpis(): Promise<FinanceKpis> {
 
 export async function listTransactions(opts: {
   type?: TxType | "";
+  excludeTypes?: TxType[];
   studentId?: string;
   from?: string;
   to?: string;
@@ -136,6 +137,9 @@ export async function listTransactions(opts: {
     .order("created_at", { ascending: false })
     .limit(opts.limit ?? 200);
   if (opts.type) q = q.eq("type", opts.type);
+  for (const excludedType of opts.excludeTypes ?? []) {
+    q = q.neq("type", excludedType);
+  }
   if (opts.from) q = q.gte("created_at", opts.from);
   if (opts.to) q = q.lte("created_at", opts.to);
   if (opts.studentId) q = q.eq("fin_accounts.student_id", opts.studentId);
