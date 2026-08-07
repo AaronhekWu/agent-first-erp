@@ -4,6 +4,7 @@ import { getSupabaseBrowser } from "@/lib/supabase/client";
 
 export type ApprovalType =
   | "student_delete"
+  | "student_freeze"
   | "course_archive"
   | "course_delete"
   | "enrollment_drop"

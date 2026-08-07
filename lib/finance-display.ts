@@ -37,6 +37,7 @@ export const APPROVAL_TYPE_LABELS: Record<string, string> = {
   enrollment_transfer: "转课审批",
   lesson_lot_delete: "课时批次删除审批",
   student_delete: "学员停用审批",
+  student_freeze: "学员冻结审批",
   staff_deactivate: "成员停用审批",
   department_delete: "部门删除审批",
   course_archive: "课程归档审批",

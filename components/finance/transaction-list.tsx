@@ -29,8 +29,16 @@ const TYPE_LABEL: Record<string, { label: string; cls: string }> = {
   prepayment_adjustment: { label: "调整预付款", cls: "text-indigo-600" },
 };
 
-export function TransactionList({ rows }: { rows: Transaction[] }) {
-  const [type, setType] = useState<TxType | "">("");
+export function TransactionList({
+  rows,
+  fixedType,
+  exportTitle = "财务流水",
+}: {
+  rows: Transaction[];
+  fixedType?: TxType;
+  exportTitle?: string;
+}) {
+  const [type, setType] = useState<TxType | "">(fixedType ?? "");
   const [query, setQuery] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -43,7 +51,8 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return rows.filter((t) => {
-      if (type && t.type !== type) return false;
+      const selectedType = fixedType ?? type;
+      if (selectedType && t.type !== selectedType) return false;
       if (from && t.created_at.slice(0, 10) < from) return false;
       if (to && t.created_at.slice(0, 10) > to) return false;
       if (min && Math.abs(Number(t.amount)) < Number(min)) return false;
@@ -55,7 +64,7 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
         (t.description ?? "").toLowerCase().includes(q)
       );
     });
-  }, [rows, type, query, from, to, min, max]);
+  }, [rows, fixedType, type, query, from, to, min, max]);
 
   const summary = useMemo(() => {
     return filtered.reduce(
@@ -80,7 +89,11 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
 
   const columnWidths = useMemo(() => ({
     time: 136,
-    type: Math.max(112, ...rows.map((row) => visualTextWidth(financeTransactionLabel(row.type), 14, 36))),
+    type: Math.max(112, ...rows.map((row) => visualTextWidth(
+      `${financeTransactionLabel(row.type)}${prepaymentRegistrationLabel(row) ?? ""}`,
+      14,
+      48,
+    ))),
     student: Math.max(148, ...rows.map((row) => visualTextWidth(
       `${row.student_name ?? "未知学员"} ${row.student_code ?? ""}`,
       14,
@@ -126,11 +139,12 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
   };
 
   const exportCsv = () => {
-    const header = ["时间", "类型", "学员", "编号", "说明", "金额", "变动前余额", "变动后余额"];
+    const header = ["时间", "类型", "报名归因", "学员", "编号", "说明", "金额", "变动前余额", "变动后余额"];
     const lines = filtered.map((t) =>
       [
         formatDate(t.created_at, true),
         financeTransactionLabel(t.type),
+        prepaymentRegistrationLabel(t) ?? "",
         t.student_name ?? "",
         t.student_code ?? "",
         t.description ?? "",
@@ -147,7 +161,7 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `财务流水-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `${exportTitle}-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -155,7 +169,12 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
   return (
     <div className="space-y-3">
       <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <div className="grid gap-3 md:grid-cols-[1.2fr_160px_140px_140px_120px_120px_auto]">
+        <div className={cn(
+          "grid gap-3",
+          fixedType
+            ? "md:grid-cols-[1.2fr_140px_140px_120px_120px_auto]"
+            : "md:grid-cols-[1.2fr_160px_140px_140px_120px_120px_auto]",
+        )}>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -165,18 +184,20 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
               className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm focus:border-brand-500 focus:bg-white focus:outline-none"
             />
           </div>
-          <select
-            value={type}
-            onChange={(e) => resetPage(() => setType(e.target.value as TxType | ""))}
-            className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm focus:border-brand-500 focus:outline-none"
-          >
-            <option value="">全部类型</option>
-            {Object.entries(TYPE_LABEL).map(([key, item]) => (
-              <option key={key} value={key}>
-                {item.label}
-              </option>
-            ))}
-          </select>
+          {!fixedType && (
+            <select
+              value={type}
+              onChange={(e) => resetPage(() => setType(e.target.value as TxType | ""))}
+              className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm focus:border-brand-500 focus:outline-none"
+            >
+              <option value="">全部类型</option>
+              {Object.entries(TYPE_LABEL).map(([key, item]) => (
+                <option key={key} value={key}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          )}
           <input type="date" value={from} onChange={(e) => resetPage(() => setFrom(e.target.value))} className="h-9 rounded-md border border-slate-200 px-3 text-sm" />
           <input type="date" value={to} onChange={(e) => resetPage(() => setTo(e.target.value))} className="h-9 rounded-md border border-slate-200 px-3 text-sm" />
           <input value={min} onChange={(e) => resetPage(() => setMin(e.target.value))} type="number" min={0} placeholder="最小金额" className="h-9 rounded-md border border-slate-200 px-3 text-sm" />
@@ -229,7 +250,7 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
               {paged.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-400">
-                    暂无流水
+                    {fixedType === "consume" ? "暂无课消记录" : "暂无流水"}
                   </td>
                 </tr>
               )}
@@ -240,12 +261,17 @@ export function TransactionList({ rows }: { rows: Transaction[] }) {
                 const sourceManaged = isSourceManagedTransaction(t);
                 const voided = isVoidedMetadata(t.metadata);
                 const balanceDisplay = financeChangeText(t);
+                const registrationKind = prepaymentRegistrationKind(t);
                 return (
                   <Fragment key={t.id}>
                     <tr className="hover:bg-slate-50">
                       <td className="whitespace-nowrap px-3 py-2 text-slate-600">{formatDate(t.created_at, true)}</td>
                       <td className="whitespace-nowrap px-3 py-2">
                         <span className={cn("font-medium", meta.cls)}>{meta.label}</span>
+                        {registrationKind && <RegistrationKindTag kind={registrationKind} />}
+                        {t.type === "prepayment_lock" && !registrationKind && (
+                          <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500">归因待核对</span>
+                        )}
                         {voided && <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500">已撤销</span>}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2 text-slate-700">
@@ -379,6 +405,34 @@ function visualTextWidth(value: string, fontSize: number, padding: number): numb
 function isVoidedMetadata(metadata: unknown): boolean {
   return Boolean(metadata && typeof metadata === "object" && "voided" in metadata
     && (metadata as { voided?: unknown }).voided === true);
+}
+
+type RegistrationKind = "new_customer" | "expansion" | "renewal";
+
+const REGISTRATION_KIND_META: Record<RegistrationKind, { label: string; cls: string }> = {
+  new_customer: { label: "新客", cls: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+  expansion: { label: "拓客", cls: "bg-violet-50 text-violet-700 ring-violet-200" },
+  renewal: { label: "续费", cls: "bg-blue-50 text-blue-700 ring-blue-200" },
+};
+
+function prepaymentRegistrationKind(transaction: Transaction): RegistrationKind | null {
+  if (transaction.type !== "prepayment_lock") return null;
+  const kind = transactionMetadata(transaction.metadata).registration_kind;
+  return kind === "new_customer" || kind === "expansion" || kind === "renewal" ? kind : null;
+}
+
+function prepaymentRegistrationLabel(transaction: Transaction): string | null {
+  const kind = prepaymentRegistrationKind(transaction);
+  return kind ? REGISTRATION_KIND_META[kind].label : null;
+}
+
+function RegistrationKindTag({ kind }: { kind: RegistrationKind }) {
+  const meta = REGISTRATION_KIND_META[kind];
+  return (
+    <span className={cn("ml-1.5 inline-flex rounded px-1.5 py-0.5 text-[11px] ring-1 ring-inset", meta.cls)}>
+      {meta.label}
+    </span>
+  );
 }
 
 function SummaryCard({ label, value, tone }: { label: string; value: number; tone: "emerald" | "amber" | "red" | "blue" | "slate" }) {

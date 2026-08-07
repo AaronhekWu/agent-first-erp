@@ -17,7 +17,7 @@ interface PageProps {
   searchParams: { tab?: string; student?: string };
 }
 
-const FINANCE_TABS = ["recharge", "refund", "consume", "transactions"] as const;
+const FINANCE_TABS = ["recharge", "refund", "consume", "transactions", "consumptions"] as const;
 
 export default async function FinancePage({ searchParams }: PageProps) {
   const me = await getMe();
@@ -25,9 +25,10 @@ export default async function FinancePage({ searchParams }: PageProps) {
   const activeTab = FINANCE_TABS.includes(searchParams.tab as (typeof FINANCE_TABS)[number])
     ? searchParams.tab
     : "recharge";
-  const [kpis, txs, rechargeStudent] = await Promise.all([
+  const [kpis, txs, consumptionTxs, rechargeStudent] = await Promise.all([
     getFinanceKpis(),
-    listTransactions({ limit: 100 }),
+    listTransactions({ limit: 500 }),
+    listTransactions({ type: "consume", limit: 1000 }),
     getRechargeStudent(searchParams.student),
   ]);
 
@@ -56,6 +57,11 @@ export default async function FinancePage({ searchParams }: PageProps) {
           { key: "refund", label: "退费", content: <RefundForm /> },
           { key: "consume", label: "手动消课", content: <ConsumeForm /> },
           { key: "transactions", label: "全部流水", content: <TransactionList rows={txs} /> },
+          {
+            key: "consumptions",
+            label: "全部课消",
+            content: <TransactionList rows={consumptionTxs} fixedType="consume" exportTitle="课消记录" />,
+          },
         ]}
       />
     </div>

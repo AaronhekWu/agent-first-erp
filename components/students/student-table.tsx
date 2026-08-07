@@ -33,7 +33,7 @@ import { StudentDrawer } from "./student-drawer";
 import { Gate } from "@/lib/auth/permissions-context";
 import { requestApproval } from "@/lib/api/approvals-client";
 import { batchDeleteStudents } from "@/lib/api/students-edge-client";
-import { batchAssignStudents, freezeStudent, reactivateStudent } from "@/lib/api/create";
+import { batchAssignStudents, reactivateStudent } from "@/lib/api/create";
 import type { Counselor, StudentRow } from "@/lib/api/students";
 import { parseStudentSort, STUDENT_SORT_OPTIONS } from "@/lib/list-sorting";
 import { UrlSortSelect } from "@/components/ui/url-sort-select";
@@ -550,7 +550,19 @@ function StudentStatusModal({
     setError(null);
     try {
       if (freezing) {
-        await freezeStudent({ p_student_id: student.id, p_frozen_at: date, p_note: reason.trim() });
+        await requestApproval({
+          type: "student_freeze",
+          title: `冻结学员审批：${student.name}`,
+          reason: reason.trim(),
+          targetId: student.id,
+          targetLabel: student.student_code ? `${student.name}（${student.student_code}）` : student.name,
+          payload: {
+            p_student_id: student.id,
+            p_frozen_at: date,
+            p_note: reason.trim(),
+          },
+        });
+        alert("冻结审批已提交，管理员通过后才会正式冻结学员。");
       } else {
         await reactivateStudent({ p_student_id: student.id, p_reason: reason.trim() });
       }
@@ -567,7 +579,7 @@ function StudentStatusModal({
       <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
         <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4">
           {freezing ? <Snowflake className="h-5 w-5 text-cyan-600" /> : <RotateCcw className="h-5 w-5 text-emerald-600" />}
-          <h3 className="font-semibold text-slate-900">{freezing ? "冻结学员" : "恢复在读"}</h3>
+          <h3 className="font-semibold text-slate-900">{freezing ? "申请冻结学员" : "恢复在读"}</h3>
         </div>
         <div className="space-y-4 px-5 py-4 text-sm">
           <p className="text-slate-600">
@@ -575,7 +587,7 @@ function StudentStatusModal({
           </p>
           {freezing && (
             <div className="rounded-md bg-cyan-50 px-3 py-2 text-xs leading-5 text-cyan-700">
-              冻结后仍保留在原班级和全部历史记录，但不能新增报名、点名或产生课消。班级结束后，系统会提醒顾问与班主任联系并办理转课或退课。
+              提交后进入审批中心，审批通过才会冻结。冻结后仍保留在原班级和全部历史记录，但不能新增报名、点名或产生课消；班级结束后会提醒顾问与班主任办理转课或退课。
             </div>
           )}
           {freezing && (
@@ -593,7 +605,7 @@ function StudentStatusModal({
         <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-3">
           <button type="button" onClick={onClose} disabled={submitting} className="h-9 rounded-md border border-slate-200 bg-white px-4 text-sm text-slate-700">取消</button>
           <button type="button" onClick={submit} disabled={submitting || !reason.trim()} className={cn("h-9 rounded-md px-4 text-sm font-medium text-white disabled:opacity-50", freezing ? "bg-cyan-600 hover:bg-cyan-700" : "bg-emerald-600 hover:bg-emerald-700")}>
-            {submitting ? "处理中…" : freezing ? "确认冻结" : "确认恢复"}
+            {submitting ? "处理中…" : freezing ? "提交冻结审批" : "确认恢复"}
           </button>
         </div>
       </div>
